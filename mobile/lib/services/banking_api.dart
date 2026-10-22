@@ -288,6 +288,135 @@ class BankingApi {
 
   Future<Map<String, dynamic>> withdrawDispute(String id) async =>
       _map(await _http.post('$_base/disputes/$id/withdraw', body: const {}));
+
+  // -- Loans ---------------------------------------------------------------
+  //
+  // `@Controller('client/banking/loans')`. These routes differ from the rest
+  // of this API in one way that matters: the server composes a borrower's view
+  // and returns it already flat, having left out what is the bank's alone --
+  // the officer, the ratios, credit data beyond the notice, reason codes,
+  // Reg O, approvals, accrual and collection internals. So they read with
+  // [_map] and [_records] and never [_flat]: there is no envelope to unwrap,
+  // and unwrapping one would drop every field.
+  //
+  // Rates arrive in basis points. [Rate] is the only thing that turns them
+  // into a percentage.
+  static const _loansBase = '$_base/loans';
+
+  /// Loans somebody may apply for. `amountCents` and `termMonths` set the
+  /// worked APR example the server returns alongside each product's terms.
+  Future<List<Map<String, dynamic>>> loanProducts({
+    int? amountCents,
+    int? termMonths,
+  }) async =>
+      _records(await _http.get('$_loansBase/products', queryParams: {
+        if (amountCents != null) 'amount': '$amountCents',
+        if (termMonths != null) 'termMonths': '$termMonths',
+      }));
+
+  /// `{total, data[]}` — my applications, newest first.
+  Future<Map<String, dynamic>> loanApplications({
+    int page = 1,
+    int pageSize = 25,
+    String? status,
+  }) async =>
+      _map(await _http.get('$_loansBase/applications', queryParams: {
+        'page': '$page',
+        'pageSize': '$pageSize',
+        if (status != null && status.isNotEmpty) 'status': status,
+      }));
+
+  /// One application: where it stands, the decision, the approved terms and
+  /// Truth in Lending figures, the adverse-action notice if it was declined,
+  /// conditions still to meet, and an `actions` map saying what I may do to
+  /// it. Another customer's application answers 404, never a hint it exists.
+  Future<Map<String, dynamic>> loanApplication(String id) async =>
+      _map(await _http.get('$_loansBase/applications/$id'));
+
+  /// Apply for myself. One applicant only — the server takes a co-borrower
+  /// only at a branch or by phone. `linkedAccount` is one of my own open
+  /// deposit accounts, and the loan pays into it.
+  Future<Map<String, dynamic>> applyForLoan({
+    required String product,
+    required int amountCents,
+    required int termMonths,
+    required String purpose,
+    required int grossMonthlyCents,
+    required String linkedAccount,
+    String? incomeSource,
+    Map<String, dynamic>? employment,
+    int? housingPaymentCents,
+  }) async =>
+      _map(await _http.post('$_loansBase/applications', body: {
+        'product': product,
+        'amount': amountCents,
+        'termMonths': termMonths,
+        'purpose': purpose,
+        'income': {
+          'grossMonthly': grossMonthlyCents,
+          if (incomeSource != null && incomeSource.isNotEmpty)
+            'source': incomeSource,
+        },
+        if (employment != null) 'employment': employment,
+        if (housingPaymentCents != null) 'housingPayment': housingPaymentCents,
+        'linkedAccount': linkedAccount,
+        // Sent only from the screen that actually asked for it, and the server
+        // refuses the application without it.
+        'consentToCreditCheck': true,
+      }));
+
+  Future<Map<String, dynamic>> withdrawLoanApplication(
+    String id, {
+    String? reason,
+  }) async =>
+      _map(await _http.post('$_loansBase/applications/$id/withdraw',
+          body: {if (reason != null && reason.isNotEmpty) 'reason': reason}));
+
+  /// Answer the bank's different offer.
+  Future<Map<String, dynamic>> answerCounteroffer(
+    String id, {
+    required bool accept,
+  }) async =>
+      _map(await _http.post('$_loansBase/applications/$id/counteroffer',
+          body: {'accept': accept}));
+
+  /// `{total, data[]}` — my loans: what I owe, the rate, the next payment.
+  Future<Map<String, dynamic>> myLoans({
+    int page = 1,
+    int pageSize = 25,
+    String? status,
+  }) async =>
+      _map(await _http.get(_loansBase, queryParams: {
+        'page': '$page',
+        'pageSize': '$pageSize',
+        if (status != null && status.isNotEmpty) 'status': status,
+      }));
+
+  /// One loan: balances, next due, rate, payoff today, the schedule, every
+  /// payment with how it was split, and late fees.
+  Future<Map<String, dynamic>> loan(String id) async =>
+      _map(await _http.get('$_loansBase/$id'));
+
+  /// What it takes to close the loan on a date — today when `date` is left
+  /// out. `date` is YYYY-MM-DD and the server rejects any other shape, so it
+  /// is never built by hand from a locale-formatted string.
+  Future<Map<String, dynamic>> payoffQuote(String id, {String? date}) async =>
+      _map(await _http.get('$_loansBase/$id/payoff',
+          queryParams: {if (date != null && date.isNotEmpty) 'date': date}));
+
+  /// Pay a loan from one of my own open deposit accounts. Carries an
+  /// idempotency key for the same reason every other money movement does.
+  Future<Map<String, dynamic>> payLoan(
+    String id, {
+    required int amountCents,
+    required String fromAccount,
+    String? idempotencyKey,
+  }) async =>
+      _map(await _http.post('$_loansBase/$id/payments', body: {
+        'amount': amountCents,
+        'from': fromAccount,
+        'idempotencyKey': idempotencyKey ?? newKey(),
+      }));
 }
 
 final bankingApi = BankingApi();
@@ -334,4 +463,32 @@ abstract final class Money {
         'EUR' => '€',
         _ => '$currency ',
       };
+}
+
+/// Basis points in, a percentage out.
+///
+/// Every rate on the lending routes is in basis points: 1299 is 12.99%. One
+/// place does the conversion, because a screen that divides by 100 twice turns
+/// a loan into a joke and nothing in the response says which it did.
+abstract final class Rate {
+  static String format(dynamic bps) {
+    final n = bps is num ? bps : num.tryParse('$bps');
+    if (n == null) return '\u2014';
+    final pct = n / 100;
+    final text = pct == pct.roundToDouble()
+        ? pct.toStringAsFixed(0)
+        : pct.toStringAsFixed(2);
+    return '$text%';
+  }
+
+  /// A product whose rate depends on who is asking advertises a band, and
+  /// showing only one end of it would read as an offer.
+  static String range(dynamic minBps, dynamic maxBps) {
+    final lo = minBps is num ? minBps : num.tryParse('$minBps');
+    final hi = maxBps is num ? maxBps : num.tryParse('$maxBps');
+    if (lo == null && hi == null) return '\u2014';
+    if (lo == null) return 'up to ${format(hi)}';
+    if (hi == null || lo == hi) return format(lo);
+    return '${format(lo)} \u2013 ${format(hi)}';
+  }
 }

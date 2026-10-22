@@ -6,10 +6,11 @@ import '../../../../config/stowbo_theme.dart';
 import '../../../../providers/banking_provider.dart';
 import '../../../account_screen.dart';
 import 'accounts_screen.dart';
+import 'loans_screen.dart';
 import 'move_money_screen.dart';
 import 'payees_screen.dart';
 
-/// The bank app: accounts, moving money, payees, account.
+/// The bank app: accounts, moving money, borrowing, payees, account.
 class BankingShell extends StatefulWidget {
   const BankingShell({super.key});
 
@@ -25,6 +26,9 @@ class _BankingShellState extends State<BankingShell> {
     final b = context.watch<BankingProvider>();
     final brand = CurrentSetup.brand;
     final unverified = b.payees.length - b.verifiedPayees.length;
+    // A loan behind on payment, or an offer the bank is waiting on an answer
+    // to, are both things somebody needs to see without opening the tab.
+    final needsAttention = b.pastDueLoans.length + b.counteroffersPending.length;
 
     return Scaffold(
       backgroundColor: SColors.paper,
@@ -38,6 +42,7 @@ class _BankingShellState extends State<BankingShell> {
             mode: MoveMode.transfer,
             key: ValueKey('move-${b.accounts.length}'),
           ),
+          const LoansScreen(),
           const PayeesScreen(),
           const AccountScreen(),
         ],
@@ -57,6 +62,19 @@ class _BankingShellState extends State<BankingShell> {
             icon: Icon(Icons.swap_horiz_outlined),
             selectedIcon: Icon(Icons.swap_horiz_rounded),
             label: 'Move',
+          ),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: needsAttention > 0,
+              label: Text('$needsAttention'),
+              child: const Icon(Icons.request_quote_outlined),
+            ),
+            selectedIcon: Badge(
+              isLabelVisible: needsAttention > 0,
+              label: Text('$needsAttention'),
+              child: const Icon(Icons.request_quote_rounded),
+            ),
+            label: 'Loans',
           ),
           NavigationDestination(
             icon: Badge(

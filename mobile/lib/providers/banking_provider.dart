@@ -160,6 +160,208 @@ class BankingProvider extends ChangeNotifier {
         await loadIdentity();
       });
 
+  // ── Loans ───────────────────────────────────────────────────────────────
+  //
+  // Lending is its own relationship with the bank, but not its own app: a loan
+  // pays into a deposit account and is paid from one, so it belongs on the
+  // provider that already holds those accounts.
+  //
+  // Nothing here decides what the borrower may do. The server sends an
+  // `actions` map on every application and loan, and the screens read it —
+  // re-deriving "can I withdraw this" from a status string would be a second
+  // rulebook that drifts from the bank's.
+
+  List<Map<String, dynamic>> _loans = const [];
+  List<Map<String, dynamic>> _applications = const [];
+  List<Map<String, dynamic>> _loanProducts = const [];
+  bool _loansLoading = false;
+  String? _loansError;
+
+  String? _loanId;
+  Map<String, dynamic> _loan = const {};
+  Map<String, dynamic> _payoff = const {};
+  bool _loanLoading = false;
+  String? _loanError;
+
+  List<Map<String, dynamic>> get loans => _loans;
+  List<Map<String, dynamic>> get applications => _applications;
+  List<Map<String, dynamic>> get loanProducts => _loanProducts;
+  bool get loansLoading => _loansLoading;
+  String? get loansError => _loansError;
+
+  Map<String, dynamic> get loan => _loan;
+  bool get loanLoading => _loanLoading;
+  String? get loanError => _loanError;
+
+  /// Today's payoff figure. Empty when the loan has no quote — a loan that is
+  /// booked but not yet paid out has nothing to pay off, and the server
+  /// refuses the quote rather than answering zero. That refusal is an answer,
+  /// so it is not kept as an error.
+  Map<String, dynamic> get payoff => _payoff;
+
+  /// Products that can be applied for in the app. A secured loan is applied
+  /// for at a branch so a loan officer can record what secures it; the server
+  /// says which with `canApplyOnline`, and the reason in `note`.
+  List<Map<String, dynamic>> get applyableLoanProducts => [
+        for (final p in _loanProducts)
+          if (p['canApplyOnline'] != false) p,
+      ];
+
+  /// An offer the bank has made that is waiting on an answer. Surfaced because
+  /// it expires, and somebody should not have to open each application to find
+  /// out that one of them needs them.
+  List<Map<String, dynamic>> get counteroffersPending => [
+        for (final a in _applications)
+          if (a['counterofferPending'] == true) a,
+      ];
+
+  /// Loans behind on payment, by the server's own count of days.
+  List<Map<String, dynamic>> get pastDueLoans => [
+        for (final l in _loans)
+          if ((l['daysPastDue'] is num ? l['daysPastDue'] as num : 0) > 0) l,
+      ];
+
+  /// Everything owed across loans, in cents. Null when no loan reported a
+  /// figure — which is not zero, and must never be shown as "$0.00".
+  int? get totalOwed {
+    var found = false;
+    var sum = 0;
+    for (final l in _loans) {
+      final owed = l['owed'];
+      if (owed is num) {
+        found = true;
+        sum += owed.round();
+      }
+    }
+    return found ? sum : null;
+  }
+
+  /// `{total, data[]}` as a list.
+  static List<Map<String, dynamic>> _page(Map<String, dynamic> res) {
+    final rows = res['data'];
+    if (rows is! List) return const [];
+    return [
+      for (final r in rows)
+        if (r is Map) Map<String, dynamic>.from(r),
+    ];
+  }
+
+  Future<void> loadLoans() async {
+    _loansLoading = true;
+    _loansError = null;
+    notifyListeners();
+    try {
+      _loans = _page(await _api.myLoans());
+      _loansError = null;
+    } catch (e) {
+      _loansError = _say(e);
+    } finally {
+      _loansLoading = false;
+      notifyListeners();
+    }
+
+    // Secondary, on the same rule as the accounts list: a loans list that
+    // loaded should draw even when applications or products are unavailable.
+    for (final read in [
+      () async => _applications = _page(await _api.loanApplications()),
+      () async => _loanProducts = await _api.loanProducts(),
+    ]) {
+      try {
+        await read();
+        notifyListeners();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> openLoanView(String id, {Map<String, dynamic>? known}) async {
+    _loanId = id;
+    _loan = known ?? const {};
+    _payoff = const {};
+    _loanLoading = true;
+    _loanError = null;
+    notifyListeners();
+
+    try {
+      _loan = await _api.loan(id);
+      _loanError = null;
+    } catch (e) {
+      if (_loan.isEmpty) _loanError = _say(e);
+    }
+
+    try {
+      _payoff = await _api.payoffQuote(id);
+    } catch (_) {
+      _payoff = const {};
+    }
+
+    _loanLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> refreshLoan() async {
+    final id = _loanId;
+    if (id != null) await openLoanView(id, known: _loan);
+  }
+
+  /// One application, read fresh. Returned rather than stored: an application
+  /// is opened, read and left, and holding the last one opened would have the
+  /// screen draw the previous application for a frame.
+  Future<Map<String, dynamic>> loanApplication(String id) =>
+      _api.loanApplication(id);
+
+  Future<String?> applyForLoan({
+    required String product,
+    required int amountCents,
+    required int termMonths,
+    required String purpose,
+    required int grossMonthlyCents,
+    required String linkedAccount,
+    String? incomeSource,
+    Map<String, dynamic>? employment,
+    int? housingPaymentCents,
+  }) =>
+      _act(() async {
+        await _api.applyForLoan(
+          product: product,
+          amountCents: amountCents,
+          termMonths: termMonths,
+          purpose: purpose,
+          grossMonthlyCents: grossMonthlyCents,
+          linkedAccount: linkedAccount,
+          incomeSource: incomeSource,
+          employment: employment,
+          housingPaymentCents: housingPaymentCents,
+        );
+        await loadLoans();
+      });
+
+  Future<String?> withdrawApplication(String id, {String? reason}) =>
+      _act(() async {
+        await _api.withdrawLoanApplication(id, reason: reason);
+        await loadLoans();
+      });
+
+  Future<String?> answerCounteroffer(String id, {required bool accept}) =>
+      _act(() async {
+        await _api.answerCounteroffer(id, accept: accept);
+        await loadLoans();
+      });
+
+  /// Pay a loan from a deposit account. Both sides move, so both are reloaded:
+  /// the loan's balance and the account the money left.
+  Future<String?> payLoan({
+    required String loanId,
+    required int amountCents,
+    required String fromAccount,
+  }) =>
+      _act(() async {
+        await _api.payLoan(loanId,
+            amountCents: amountCents, fromAccount: fromAccount);
+        await load();
+        await refreshLoan();
+        await loadLoans();
+      });
+
   // ── Loading ─────────────────────────────────────────────────────────────
 
   Future<void> load() async {
