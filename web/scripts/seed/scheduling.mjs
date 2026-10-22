@@ -428,7 +428,10 @@ async function upsert(datatype, data) {
 async function reservationAutomations() {
   const out = [];
   for (const dt of ["automation", "workflow_definition"]) {
-    const r = await call("POST", `repository/find/${dt}`, { query: {}, options: { page: 1, pageSize: 500 } }).catch(() => ({ data: [] }));
+    // Fail closed: a sign-in that can't read automations can't say none would fire.
+    const r = await call("POST", `repository/find/${dt}`, { query: {}, options: { page: 1, pageSize: 500 } }).catch((e) => {
+      throw new Error(`Can't check ${dt} records before writing bookings (${e.message.slice(0, 120)}). Sign in as staff, or run with --no-load.`);
+    });
     for (const a of r?.data || []) {
       const s = JSON.stringify(a.data || {}).toLowerCase();
       const active = !["inactive", "disabled", "draft", "paused"].includes(String(a.data?.status || "active").toLowerCase()) && a.data?.enabled !== false && a.data?.active !== false;
