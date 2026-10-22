@@ -1,0 +1,302 @@
+{
+ "muvmnt": {
+  "shots": [
+   {
+    "file": "/directory/muvmnt/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/muvmnt/01-eat.jpg",
+    "path": "/eat",
+    "title": "Food delivery"
+   },
+   {
+    "file": "/directory/muvmnt/02-ride.jpg",
+    "path": "/ride",
+    "title": "Ride"
+   },
+   {
+    "file": "/directory/muvmnt/03-send.jpg",
+    "path": "/send",
+    "title": "Send a package"
+   }
+  ],
+  "phone": "/directory/muvmnt/phone-home.jpg"
+ },
+ "event-oxygen": {
+  "shots": [
+   {
+    "file": "/directory/event-oxygen/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/event-oxygen/01-events.jpg",
+    "path": "/events",
+    "title": "Events"
+   },
+   {
+    "file": "/directory/event-oxygen/02-shop.jpg",
+    "path": "/shop",
+    "title": "Shop"
+   },
+   {
+    "file": "/directory/event-oxygen/03-login.jpg",
+    "path": "/login",
+    "title": "Sign in"
+   }
+  ],
+  "phone": "/directory/event-oxygen/phone-home.jpg"
+ },
+ "stowbo": {
+  "shots": [
+   {
+    "file": "/directory/stowbo/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/stowbo/01-browse.jpg",
+    "path": "/browse",
+    "title": "Browse spaces"
+   },
+   {
+    "file": "/directory/stowbo/02-how-it-works.jpg",
+    "path": "/how-it-works",
+    "title": "How it works"
+   },
+   {
+    "file": "/directory/stowbo/03-login.jpg",
+    "path": "/login",
+    "title": "Sign in"
+   },
+   {
+    "file": "/directory/stowbo/04-listing-6a87827ee8b51c61f14520fb.jpg",
+    "path": "/listing/6a87827ee8b51c61f14520fb",
+    "title": "Alpine Base Ski & Board Lockers \u2014 Sport Locker in Olympic Valley, CA"
+   }
+  ],
+  "phone": "/directory/stowbo/phone-home.jpg"
+ },
+ "rental": {
+  "shots": [
+   {
+    "file": "/directory/rental/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/rental/01-shop.jpg",
+    "path": "/shop",
+    "title": "Shop"
+   },
+   {
+    "file": "/directory/rental/02-login.jpg",
+    "path": "/login",
+    "title": "Sign in"
+   },
+   {
+    "file": "/directory/rental/03-listing-6ad83dbd54b97eb21d2dead6.jpg",
+    "path": "/listing/6ad83dbd54b97eb21d2dead6",
+    "title": "Sony FX3 Cinema Kit \u2014 Dallas, TX"
+   }
+  ],
+  "phone": "/directory/rental/phone-home.jpg"
+ },
+ "stays": {
+  "shots": [
+   {
+    "file": "/directory/stays/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/stays/01-login.jpg",
+    "path": "/login",
+    "title": "Sign in"
+   },
+   {
+    "file": "/directory/stays/02-listing-6ad83dbb54b97eb21d2dea88.jpg",
+    "path": "/listing/6ad83dbb54b97eb21d2dea88",
+    "title": "Kestrel Ridge A-Frame \u2014 A-frame in Broken Bow, OK"
+   }
+  ],
+  "phone": "/directory/stays/phone-home.jpg"
+ },
+ "law-firm": {
+  "shots": [
+   {
+    "file": "/directory/law-firm/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/law-firm/01-book.jpg",
+    "path": "/book",
+    "title": "Book a consultation"
+   },
+   {
+    "file": "/directory/law-firm/02-team.jpg",
+    "path": "/team",
+    "title": "Attorneys"
+   },
+   {
+    "file": "/directory/law-firm/03-login.jpg",
+    "path": "/login",
+    "title": "Sign in"
+   },
+   {
+    "file": "/directory/law-firm/04-book-discovery-call.jpg",
+    "path": "/book/discovery-call",
+    "title": "Discovery call"
+   }
+  ],
+  "phone": "/directory/law-firm/phone-home.jpg"
+ },
+ "medical": {
+  "shots": [
+   {
+    "file": "/directory/medical/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/medical/01-book.jpg",
+    "path": "/book",
+    "title": "Book a visit"
+   },
+   {
+    "file": "/directory/medical/02-team.jpg",
+    "path": "/team",
+    "title": "Our clinicians"
+   },
+   {
+    "file": "/directory/medical/03-login.jpg",
+    "path": "/login",
+    "title": "Sign in"
+   }
+  ],
+  "phone": "/directory/medical/phone-home.jpg"
+ },
+ "studio": {
+  "shots": [
+   {
+    "file": "/directory/studio/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/studio/01-book.jpg",
+    "path": "/book",
+    "title": "Class schedule"
+   },
+   {
+    "file": "/directory/studio/02-memberships.jpg",
+    "path": "/memberships",
+    "title": "Pricing"
+   },
+   {
+    "file": "/directory/studio/03-team.jpg",
+    "path": "/team",
+    "title": "Coaches"
+   }
+  ],
+  "phone": "/directory/studio/phone-home.jpg"
+ },
+ "bank": {
+  "shots": [
+   {
+    "file": "/directory/bank/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/bank/01-login.jpg",
+    "path": "/login",
+    "title": "Sign in"
+   }
+  ],
+  "phone": "/directory/bank/phone-home.jpg"
+ },
+ "academy": {
+  "shots": [
+   {
+    "file": "/directory/academy/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/academy/01-learn.jpg",
+    "path": "/learn",
+    "title": "Courses"
+   },
+   {
+    "file": "/directory/academy/02-login.jpg",
+    "path": "/login",
+    "title": "Sign in"
+   },
+   {
+    "file": "/directory/academy/03-learn-new-hire-onboarding.jpg",
+    "path": "/learn/new-hire-onboarding",
+    "title": "New Hire Onboarding"
+   }
+  ],
+  "phone": "/directory/academy/phone-home.jpg"
+ },
+ "shop": {
+  "shots": [
+   {
+    "file": "/directory/shop/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/shop/01-shop.jpg",
+    "path": "/shop",
+    "title": "Shop"
+   },
+   {
+    "file": "/directory/shop/02-login.jpg",
+    "path": "/login",
+    "title": "Sign in"
+   },
+   {
+    "file": "/directory/shop/03-shop-gift-cards.jpg",
+    "path": "/shop/gift-cards",
+    "title": "Gift cards"
+   }
+  ],
+  "phone": "/directory/shop/phone-home.jpg"
+ },
+ "demo": {
+  "shots": [
+   {
+    "file": "/directory/demo/00-home.jpg",
+    "path": "/",
+    "title": "Home"
+   },
+   {
+    "file": "/directory/demo/01-book.jpg",
+    "path": "/book",
+    "title": "Book"
+   },
+   {
+    "file": "/directory/demo/02-send.jpg",
+    "path": "/send",
+    "title": "Send a package"
+   },
+   {
+    "file": "/directory/demo/03-browse.jpg",
+    "path": "/browse",
+    "title": "Browse spaces"
+   },
+   {
+    "file": "/directory/demo/04-listing-6ad51542cf02ee75d88476f2.jpg",
+    "path": "/listing/6ad51542cf02ee75d88476f2",
+    "title": "/listing/6ad51542cf02ee75d88476f2"
+   }
+  ],
+  "phone": "/directory/demo/phone-home.jpg"
+ }
+}

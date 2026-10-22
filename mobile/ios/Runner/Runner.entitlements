@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+	<!-- Tap to Pay on iPhone (Stripe Terminal) entitlement goes here — but it must
+	     first be GRANTED by Apple for App ID com.stowbo.stowbo. Request it at
+	     developer.apple.com/contact/request/tap-to-pay-on-iphone (and enable the
+	     capability on the App ID). Adding the key BEFORE approval breaks signing:
+	     "Entitlement … not found and could not be included in profile." Once
+	     granted, re-add:
+	     <key>com.apple.developer.proximity-reader.payment.acceptance</key><true/>
+	     Until then Send-link / QR work; enableTapToPay() is unavailable. -->
+</dict>
+</plist>

@@ -1,0 +1,49 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Events module (Event Oxygen). Night palette: near-black plum, one loud accent
+   (oxygen coral) for dates and the buy button, posters carry the colour.
+   The screens are base-app components (modules/events/base) styled with Tailwind and
+   the setup's tokens; this file keeps only the setup-scoped dark overrides.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Event Oxygen runs dark everywhere: shared pieces that hard-code white ── */
+html[data-setup="event-oxygen"]{color-scheme:dark;--shadow:0 8px 24px rgba(0,0,0,.35);--shadow-lg:0 22px 54px rgba(0,0,0,.5);--shadow-xl:0 34px 84px rgba(0,0,0,.6);--white:#fff}
+html[data-setup="event-oxygen"] body{background:var(--bg)}
+html[data-setup="event-oxygen"] .hdr{background:color-mix(in srgb,var(--bg) 88%,transparent)}
+html[data-setup="event-oxygen"] .hdr.solid{border-bottom-color:var(--border-2)}
+html[data-setup="event-oxygen"] .btn.ink{background:#fff;color:#0b0910}
+html[data-setup="event-oxygen"] .btn.ink:hover{background:var(--primary);color:#fff}
+html[data-setup="event-oxygen"] .btn.ghost:hover{background:#fff;color:#0b0910}
+html[data-setup="event-oxygen"] .foot{background:#06050a;border-top:1px solid var(--border-2);color:#a9a2b9}
+html[data-setup="event-oxygen"] .foot p.mm,html[data-setup="event-oxygen"] .foot .bottom{color:#7d7690}
+html[data-setup="event-oxygen"] .foot a{color:#bdb6cc}
+html[data-setup="event-oxygen"] .foot a:hover{color:var(--primary)}
+html[data-setup="event-oxygen"] .field input,html[data-setup="event-oxygen"] .field select,html[data-setup="event-oxygen"] .field textarea,
+html[data-setup="event-oxygen"] .sbtn,html[data-setup="event-oxygen"] .chip,html[data-setup="event-oxygen"] .sortsel,
+html[data-setup="event-oxygen"] .pm-form select,html[data-setup="event-oxygen"] .dlg-link input,html[data-setup="event-oxygen"] .ho-code input{background:var(--bg-2);color:var(--text);border-color:var(--border)}
+html[data-setup="event-oxygen"] .sbtn:hover{background:var(--surface-2,#1f1a2a)}
+html[data-setup="event-oxygen"] input,html[data-setup="event-oxygen"] select,html[data-setup="event-oxygen"] textarea{color-scheme:dark}
+html[data-setup="event-oxygen"] .dash-nav a[style*="var(--text)"]{background:#fff !important;color:#0b0910 !important}
+html[data-setup="event-oxygen"] .tcard[style*="var(--text)"]{background:linear-gradient(135deg,#2a1530,#170f22) !important;border-color:var(--border) !important}
+html[data-setup="event-oxygen"] [style*="background: var(--text)"],html[data-setup="event-oxygen"] [style*="background:var(--text)"]{background:var(--primary) !important}
+html[data-setup="event-oxygen"] .appbadge{background:#fff;color:#0b0910}
+html[data-setup="event-oxygen"] .setup-switcher a:hover{background:#2a2436}
+
+
+/* ── module page padding (screens are base-app components, styled with Tailwind + setup tokens) ── */
+.ev-page{padding-top:28px;padding-bottom:56px}
+
+/* Header at phone width: brand + cart + sign-in + menu don't fit the shared 32px gaps
+   (the burger lands off-screen at 390px). Scoped to this setup. */
+@media(max-width:480px){
+  html[data-setup="event-oxygen"] .hdr .in{gap:14px}
+  html[data-setup="event-oxygen"] .hdr .wordmark{font-size:21px}
+  html[data-setup="event-oxygen"] .foot .cols{grid-template-columns:1fr 1fr !important;gap:26px 18px}
+  html[data-setup="event-oxygen"] .foot .cols>:first-child{grid-column:1/-1}
+}
+
+/* The shared stylesheet's unlayered `.grid` (Stowbo's 4-column listing grid) beats
+   Tailwind's layered `grid` / `grid-cols-*` / `gap-*`; hand those back to Tailwind
+   inside the ported base-app screens. */
+.ev-tw .grid{grid-template-columns:revert-layer;gap:revert-layer}
+/* base-app grids hold truncating text; let their items shrink at phone width. */
+.ev-tw .grid>*{min-width:0}

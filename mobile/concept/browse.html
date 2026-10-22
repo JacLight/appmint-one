@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Browse stow spaces — Stowbo</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="hdr">
+  <div class="wrap in">
+    <a class="brand" href="index.html"><img src="stowbo-green.png" alt="Stowbo"></a>
+    <nav class="nav"><a href="browse.html">Browse spaces</a><a href="index.html#how">How it works</a><a href="index.html#verticals">What you can stow</a><a href="host.html">Become a host</a></nav>
+    <div class="sp"></div>
+    <div class="acts"><a class="btn ghost sm" href="host.html">List your space</a><a class="btn dark sm" href="#">Sign in</a><div class="avatar">J</div></div>
+    <button class="burger">☰</button>
+  </div>
+</header>
+
+<div class="subsearch">
+  <div class="wrap in">
+    <div class="ss-field"><label>What</label><select><option>Bags &amp; luggage</option><option>Event gear</option><option>Self‑park</option><option>Coat check</option><option>Locker</option></select></div>
+    <div class="ss-field w"><label>Where</label><input value="Austin, TX"></div>
+    <div class="ss-field"><label>Drop‑off</label><input placeholder="Today · 2:00 PM"></div>
+    <div class="ss-field"><label>Pick‑up</label><input placeholder="Today · 9:00 PM"></div>
+    <a class="btn lime" href="browse.html">Search</a>
+  </div>
+</div>
+
+<div class="wrap browse">
+  <!-- FILTERS -->
+  <aside class="filters">
+    <h4>Filters</h4>
+    <div class="fgroup">
+      <label class="fitem"><input type="checkbox" checked>Bags &amp; luggage<span class="c">128</span></label>
+      <label class="fitem"><input type="checkbox">Event gear<span class="c">41</span></label>
+      <label class="fitem"><input type="checkbox">Self‑park<span class="c">96</span></label>
+      <label class="fitem"><input type="checkbox">Coat check<span class="c">22</span></label>
+      <label class="fitem"><input type="checkbox">Lockers<span class="c">54</span></label>
+    </div>
+    <div class="fgroup">
+      <h4>Custody</h4>
+      <label class="fitem"><input type="checkbox">Staffed handoff</label>
+      <label class="fitem"><input type="checkbox">Self‑serve / locker</label>
+    </div>
+    <div class="fgroup">
+      <h4>Price / hour</h4>
+      <div class="range"><input placeholder="$ min"><input placeholder="$ max"></div>
+    </div>
+    <div class="fgroup">
+      <h4>Amenities</h4>
+      <label class="fitem"><input type="checkbox">Indoors / covered</label>
+      <label class="fitem"><input type="checkbox">24/7 access</label>
+      <label class="fitem"><input type="checkbox">CCTV / secure room</label>
+      <label class="fitem"><input type="checkbox">Late pickup</label>
+      <label class="fitem"><input type="checkbox">At event venue</label>
+    </div>
+    <div class="fgroup">
+      <h4>Rating</h4>
+      <label class="fitem"><input type="checkbox">4.5★ &amp; up</label>
+      <label class="fitem"><input type="checkbox">4.8★ &amp; up</label>
+    </div>
+  </aside>
+
+  <!-- RESULTS -->
+  <div>
+    <div class="results-head">
+      <h1>184 stow spaces in Austin, TX</h1>
+      <div class="r2">
+        <select class="sortsel"><option>Sort: Recommended</option><option>Price: low to high</option><option>Rating</option><option>Distance</option></select>
+        <button class="maptoggle">🗺️ Map</button>
+      </div>
+    </div>
+    <div class="grid browse-grid" id="grid"></div>
+  </div>
+</div>
+
+<footer class="foot"><div class="wrap"><div class="bottom"><span>© 2026 Stowbo, Inc.</span><span>Privacy · Terms · Protection policy</span></div></div></footer>
+
+<script>
+var L=[
+ {t:"Verde Coffee — Bag Drop",city:"Downtown · 0.3 mi",cat:"Bags",rate:3,unit:"/bag · day",star:4.9,rev:214,seed:"cafe1",pills:["Staffed","Indoors","Same‑day"]},
+ {t:"5th & Congress Garage",city:"Downtown · 0.5 mi",cat:"Self‑park",rate:4.5,unit:"/hr",star:4.8,rev:512,seed:"garage2",pills:["Covered","24/7","EV nearby"]},
+ {t:"Zilker Fest — Gear Check",city:"Zilker Park · at venue",cat:"Event",rate:6,unit:"/item",star:4.9,rev:1330,seed:"fest3",pills:["At venue","Fast lane","Staffed"]},
+ {t:"Hotel Nex — Left Luggage",city:"Downtown · 0.8 mi",cat:"Bags",rate:5,unit:"/bag · day",star:4.7,rev:98,seed:"hotel4",pills:["Front desk","Secure room","Late pickup"]},
+ {t:"Union Depot Lockers",city:"Rail Station · 1.1 mi",cat:"Lockers",rate:2.5,unit:"/hr",star:4.6,rev:76,seed:"locker5",pills:["Self‑serve","Any size","Flexible"]},
+ {t:"The Vault Club — Coat Check",city:"Warehouse Dist · 1.4 mi",cat:"Coat check",rate:3,unit:"/item",star:4.8,rev:141,seed:"club6",pills:["Nightlife","Staffed","Numbered"]},
+ {t:"Riverside Lot — Self‑Park",city:"South Shore · 0.6 mi",cat:"Self‑park",rate:3.5,unit:"/hr",star:4.7,rev:288,seed:"lot7",pills:["Open‑air","Plate entry","Event rate"]},
+ {t:"Maker's Market — Stall Store",city:"East Side · 0.4 mi",cat:"Gear",rate:4,unit:"/item · day",star:5.0,rev:63,seed:"market8",pills:["Vendor gear","Indoors","Day rate"]},
+ {t:"Barton Springs Bike Hold",city:"Barton · 0.9 mi",cat:"Gear",rate:2,unit:"/hr",star:4.8,rev:52,seed:"bike9",pills:["Bike rack","Locked","Outdoors"]},
+ {t:"Rainey St. Bag Check",city:"Rainey · 0.7 mi",cat:"Bags",rate:4,unit:"/bag · day",star:4.6,rev:174,seed:"bar10",pills:["Nightlife","Staffed","Late pickup"]},
+ {t:"Convention Ctr Coat Check",city:"Downtown · at venue",cat:"Coat check",rate:2.5,unit:"/item",star:4.7,rev:410,seed:"conv11",pills:["At venue","Fast lane","Staffed"]},
+ {t:"Eastside Self Lockers",city:"East Side · 1.0 mi",cat:"Lockers",rate:2,unit:"/hr",star:4.5,rev:39,seed:"lock12",pills:["24/7","App unlock","Any size"]}
+];
+var star='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.8 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>';
+var pin='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+document.getElementById('grid').innerHTML=L.map(function(l){
+  return '<a class="lcard" href="listing.html"><div class="ph"><img src="https://picsum.photos/seed/'+l.seed+'/600/450" loading="lazy" alt=""><span class="tag">'+l.cat+'</span><button class="fav">♡</button></div>'
+   +'<div class="b"><div class="row1"><h3>'+l.t+'</h3><span class="rate">'+star+l.star+'</span></div>'
+   +'<div class="loc">'+pin+l.city+'</div><div class="meta">'+l.pills.map(function(p){return '<span class="pill">'+p+'</span>';}).join('')+'</div>'
+   +'<div class="price"><span><b>$'+l.rate+'</b> <small>'+l.unit+'</small></span><span class="book">'+l.rev+' reviews →</span></div></div></a>';
+}).join('');
+</script>
+</body>
+</html>

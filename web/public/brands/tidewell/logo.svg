@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="152" height="36" viewBox="0 0 152 36" fill="none">
+  <rect x="0" y="2" width="32" height="32" rx="9" fill="#0b5563"/>
+  <path d="M6 21.5c2.6 0 2.6-2.4 5.2-2.4s2.6 2.4 5.2 2.4 2.6-2.4 5.2-2.4 2.6 2.4 4.4 2.4" stroke="#bff0dd" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M6 15c2.6 0 2.6-2.4 5.2-2.4s2.6 2.4 5.2 2.4 2.6-2.4 5.2-2.4 2.6 2.4 4.4 2.4" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" opacity=".9"/>
+  <text x="41" y="26" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="23" font-weight="600" letter-spacing="-0.6" fill="#0b1c24">Tidewell</text>
+</svg>

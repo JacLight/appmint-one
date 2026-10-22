@@ -1,0 +1,32 @@
+# Safety net for the whole repo. web/ and mobile/ keep their own .gitignore
+# files as well; these rules are the ones that must never be forgotten.
+
+# Secrets — nothing matching these is ever committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.p12
+*.key
+*.keystore
+*.jks
+key.properties
+config/local.json
+service-account*.json
+
+# Dependencies and build output
+node_modules/
+.next/
+out/
+build/
+.dart_tool/
+.gradle/
+*.apk
+*.aab
+*.ipa
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store

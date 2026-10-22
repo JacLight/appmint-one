@@ -1,0 +1,41 @@
+/* base/tokens.css — generated: the shadcn colour utilities base-app's storefront uses
+   (bg-primary, text-muted-foreground, border-border, …) mapped onto this app's setup tokens.
+   base-app defines them with a Tailwind @theme block; here they are plain classes so the
+   shared globals.css stays untouched. */
+.bg-background{background-color:var(--surface)}
+.bg-border{background-color:var(--border)}
+.bg-card{background-color:var(--surface)}
+.bg-destructive{background-color:#b42318}
+.bg-muted{background-color:var(--bg-2)}
+.bg-primary{background-color:var(--primary)}
+.bg-secondary{background-color:var(--bg-2)}
+.border-input{border-color:var(--border)}
+.focus-visible\:ring-ring:focus-visible{--tw-ring-color:var(--primary)}
+.focus\:ring-ring:focus{--tw-ring-color:var(--primary)}
+.hover\:bg-destructive\/80:hover{background-color:color-mix(in srgb, #b42318 80%, transparent)}
+.hover\:bg-primary\/80:hover{background-color:color-mix(in srgb, var(--primary) 80%, transparent)}
+.hover\:bg-primary\/90:hover{background-color:color-mix(in srgb, var(--primary) 90%, transparent)}
+.hover\:bg-secondary\/80:hover{background-color:color-mix(in srgb, var(--bg-2) 80%, transparent)}
+.hover\:text-primary:hover{color:var(--primary)}
+.hover\:text-primary\/80:hover{color:color-mix(in srgb, var(--primary) 80%, transparent)}
+.ring-offset-background{--tw-ring-offset-color:var(--surface)}
+.text-card-foreground{color:var(--text)}
+.text-destructive-foreground{color:#fff}
+.text-foreground{color:var(--text)}
+.text-muted-foreground{color:var(--muted)}
+.text-primary{color:var(--primary)}
+.text-primary-foreground{color:var(--primary-ink)}
+.text-secondary-foreground{color:var(--text)}
+
+/* base-app's base layer: every border takes the border token (shadcn `* { @apply border-border }`). */
+.sf-store *,.sf-store *::before,.sf-store *::after{border-color:var(--border)}
+.sf-store{color:var(--text);font-family:var(--font-body)}
+/* toast line (shims/sonner) */
+.sf-toaster{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1000;display:grid;gap:8px;width:min(92vw,420px)}
+.sf-toast{background:var(--text);color:var(--bg);border-radius:12px;padding:12px 16px;font:500 14px/1.4 var(--font-body);box-shadow:var(--shadow-lg)}
+.sf-toast-error{background:#a3261e;color:#fff}
+.sf-toast-success{background:var(--accent);color:var(--accent-ink)}
+/* The header bag opens the drawer, so base-app's floating cart button is not shown. */
+.sf-store-cart [data-chrome="cart"]{display:none}
+/* Phone widths: let flex-1 children shrink (the catalog search bar ran 4px past a 390px screen). */
+.sf-store .flex > .flex-1{min-width:0}

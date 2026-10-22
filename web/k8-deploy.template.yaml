@@ -1,0 +1,63 @@
+# Appmint One — k8s template. One Deployment per setup.
+# Render with envsubst, e.g.:
+#   SETUP=stowbo NAMESPACE=default HOST=stowbo.com IMAGE=jaclight/appmint-one:stowbo-0.1.0 \
+#     envsubst < k8-deploy.template.yaml | kubectl apply -f -
+#
+# Secrets are NEVER written here. Create the Secret once per setup:
+#   kubectl -n $NAMESPACE create secret generic appmint-one-$SETUP-env \
+#     --from-literal=ORG_ID=... --from-literal=APPENGINE_ENDPOINT=... \
+#     --from-literal=APP_ID=... --from-literal=APP_KEY=... --from-literal=APP_SECRET=... \
+#     --from-literal=GOOGLE_ID=... --from-literal=GOOGLE_SECRET=... \
+#     --from-literal=FACEBOOK_ID=... --from-literal=FACEBOOK_SECRET=... \
+#     --from-literal=GOOGLE_MAPS_KEY=...          # only setups with rentals
+# Optional keys (add with --from-literal when used): PORTAL_GA_ID,
+# PORTAL_GOOGLE_SITE_VERIFICATION, PORTAL_CHAT_CONFIG_ID, PORTAL_CHAT_APP_ID,
+# CHAT_API_HOST, APP_STORE_URL.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appmint-one-${SETUP}
+  namespace: ${NAMESPACE}
+  labels: { app: appmint-one-${SETUP}, product: appmint-one, setup: ${SETUP} }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: appmint-one-${SETUP} }
+  template:
+    metadata:
+      labels: { app: appmint-one-${SETUP}, product: appmint-one, setup: ${SETUP} }
+    spec:
+      containers:
+        - name: appmint-one
+          image: ${IMAGE}
+          imagePullPolicy: Always
+          ports: [{ containerPort: 3000 }]
+          env:
+            - { name: PORTAL_SETUP, value: "${SETUP}" }
+            - { name: APP_URL, value: "https://${HOST}" }
+            - { name: SITE_URL, value: "https://${HOST}" }
+            - { name: NEXT_PUBLIC_APP_URL, value: "https://${HOST}" }
+          # Everything secret (and every optional key) comes from the Secret.
+          envFrom:
+            - secretRef: { name: appmint-one-${SETUP}-env }
+          readinessProbe:
+            httpGet: { path: /robots.txt, port: 3000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /robots.txt, port: 3000 }
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 768Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appmint-one-${SETUP}
+  namespace: ${NAMESPACE}
+  labels: { app: appmint-one-${SETUP}, product: appmint-one }
+spec:
+  selector: { app: appmint-one-${SETUP} }
+  ports: [{ port: 80, targetPort: 3000, protocol: TCP }]
