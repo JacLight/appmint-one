@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { getErrorMessage } from "@/lib/errors";
 import * as R from "@/api/reservations";
-import { bookingTypes, guestBooking, myBooking, plans, statusOf } from "../lib/data";
+import { bookingTypes, guestBooking, myBooking, plans, serviceName, statusOf } from "../lib/data";
 import { isClosed } from "../lib/catalog";
 
 const MINE = "/account/scheduling";
@@ -36,7 +36,7 @@ export async function bookAction(input: {
   if (!input.startTime || Number.isNaN(Date.parse(input.startTime))) return { ok: false, error: "Pick a time first." };
   const host = input.host && type.hosts.includes(input.host.toLowerCase()) ? input.host.toLowerCase() : undefined;
   const intake = Object.fromEntries(Object.entries(input.intake || {}).map(([k, v]) => [k, clean(v)]).filter(([k, v]) => /^[A-Za-z][A-Za-z0-9_]{0,40}$/.test(k) && v));
-  const service = input.service && type.services.some((s) => s.name === input.service) ? input.service : type.services[0]?.name;
+  const service = serviceName(type, input.service);
   const notes = [intake.reason, ...Object.entries(intake).filter(([k]) => LABELS[k]).map(([k, v]) => `${LABELS[k]}: ${v}`)].filter(Boolean).join("\n") || undefined;
   const body: Record<string, any> = { reservationDefinitionId: type.id, service, startTime: input.startTime, hosts: host, notes, intake: Object.keys(intake).length ? intake : undefined };
 

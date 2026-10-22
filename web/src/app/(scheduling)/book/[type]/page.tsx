@@ -7,7 +7,7 @@ import { getSetup } from "@/lib/setup";
 import { getSession } from "@/lib/auth";
 import { availability, bookingType, myMemberships, plans } from "@/modules/scheduling/lib/data";
 import { hostOf } from "@/modules/scheduling/lib/catalog";
-import { dayKey, dayLong, duration, isKey, keyLong, money, time, todayKey } from "@/modules/scheduling/lib/format";
+import { dayKey, dayLong, duration, isKey, keyLong, money, time, todayKey, zoneName } from "@/modules/scheduling/lib/format";
 import { Avatar, DayStrip, Empty, Ic, Img, Spots } from "@/modules/scheduling/components/bits";
 import { BookConfirm } from "@/modules/scheduling/components/book/book-confirm";
 
@@ -24,9 +24,11 @@ export async function generateMetadata({ params }: { params: P }): Promise<Metad
 export default async function BookTypePage({ params, searchParams }: { params: P; searchParams: SP }) {
   const [{ type: slug }, sp, setup, session] = await Promise.all([params, searchParams, getSetup(), getSession()]);
   const cfg = setup.scheduling!;
-  const tz = cfg.timezone;
   const type = await bookingType(slug);
   if (!type || type.hidden || type.kind === "meeting") notFound();
+  // Times are shown in the zone of the person being booked (their definition's office hours).
+  const tz = type.timezone || cfg.timezone;
+  const s0 = type.services.find((s) => s.name === one(sp.service)) || type.services[0];
 
   const people = type.team.filter((m) => type.hosts.includes(m.email));
   const withQ = one(sp.with)?.toLowerCase();
@@ -36,7 +38,7 @@ export default async function BookTypePage({ params, searchParams }: { params: P
   const at = atQ && !Number.isNaN(Date.parse(atQ)) && Date.parse(atQ) > Date.now() ? new Date(atQ).toISOString() : undefined;
 
   const today = todayKey(tz);
-  const avail = await availability(type, { from: today, days: 14, host: host?.email });
+  const avail = await availability(type, { from: today, days: 14, host: host?.email, service: s0?.name });
   const now = Date.now();
   const allSlots = (avail?.days || []).flatMap((d) => d.slots || []).filter((s) => Date.parse(s.startTime) > now);
   const days = (avail?.days || []).map((d) => d.date).filter(isKey);
@@ -50,7 +52,7 @@ export default async function BookTypePage({ params, searchParams }: { params: P
 
   const href = (o: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    for (const [k, v] of Object.entries({ with: host?.email, ...o })) if (v) p.set(k, v);
+    for (const [k, v] of Object.entries({ with: host?.email, service: s0 && s0 !== type.services[0] ? s0.name : undefined, ...o })) if (v) p.set(k, v);
     const s = p.toString();
     return `/book/${type.slug}${s ? `?${s}` : ""}`;
   };
@@ -60,7 +62,6 @@ export default async function BookTypePage({ params, searchParams }: { params: P
 
   // Studio: say which membership the customer holds (storefront subscriptions); the
   // engine doesn't tie a booking to a pass, so nothing is counted or required here.
-  const s0 = type.services[0];
   let costLine = "";
   if (cfg.style === "studio") {
     const [mine, ladder] = await Promise.all([session.signedIn ? myMemberships() : Promise.resolve([]), plans()]);
@@ -89,7 +90,9 @@ export default async function BookTypePage({ params, searchParams }: { params: P
                 <h1>{type.title}</h1>
                 <p className="bt-desc">{type.description}</p>
                 <ul className="bt-facts">
+                  {s0 && !s0.implicit && s0.name !== type.title ? <li><Ic n="doc" size={16} /> {s0.name}{s0.price ? ` · ${money(s0.price)}` : ""}</li> : null}
                   {s0?.duration ? <li><Ic n="clock" size={16} /> {duration(s0.duration)}</li> : null}
+                  <li><Ic n="clock" size={16} /> Times in {zoneName(tz)}</li>
                   {type.room ? <li><Ic n="door" size={16} /> {type.room}</li> : null}
                   {isClass ? <li><Ic n="users" size={16} /> Up to {type.spots}</li> : null}
                   <li><Ic n={type.video ? "video" : "pin"} size={16} /> {type.video ? "From home, by video" : type.location || cfg.place.name}</li>
@@ -112,7 +115,7 @@ export default async function BookTypePage({ params, searchParams }: { params: P
             )}
 
             <div className="bt-when">
-              <h2>Pick a time</h2>
+              <h2>{at ? <span className="bt-step">1</span> : null}Pick a time</h2>
               {!avail ? (
                 <Empty title="Times aren’t loading right now">Please refresh in a moment{cfg.place.phone ? `, or call ${cfg.place.phone}` : ""}.</Empty>
               ) : days.length === 0 || allSlots.length === 0 ? (
@@ -146,33 +149,39 @@ export default async function BookTypePage({ params, searchParams }: { params: P
             </div>
           </div>
 
-          <aside className="bt-side" id="confirm">
+          <aside className="bt-side">
             <div className="bt-card">
               {at ? (
                 <>
                   <p className="eyebrow">Your {cfg.style === "studio" ? (isClass ? "class" : "session") : cfg.style === "clinic" ? "visit" : "consultation"}</p>
-                  <h2>{type.title}</h2>
+                  <h2>{s0 && !s0.implicit && s0.name !== type.title ? s0.name : type.title}</h2>
                   <ul className="bt-sum">
-                    <li><Ic n="cal" size={17} /><span><b>{dayLong(at, tz)}</b>{time(at, tz)}{s0?.duration ? ` · ${duration(s0.duration)}` : ""}</span></li>
+                    <li><Ic n="cal" size={17} /><span><b>{dayLong(at, tz)}</b>{time(at, tz)}{s0?.duration ? ` · ${duration(s0.duration)}` : ""} · <Link className="bt-change" href={href({ day })} scroll={false}>Change</Link></span></li>
                     {withMember ? <li><Avatar m={withMember} size={34} /><span><b>{withMember.name}</b>{withMember.title}</span></li> : <li><Ic n="user" size={17} /><span><b>First available</b>We&rsquo;ll confirm who you&rsquo;ll see</span></li>}
                     <li><Ic n={type.video ? "video" : "pin"} size={17} /><span><b>{type.video ? "Video visit" : cfg.place.name}</b>{type.video ? "We’ll send the link before your visit" : `${cfg.place.street}, ${cfg.place.city}`}</span></li>
                     {costLine && <li><Ic n="card" size={17} /><span><b>{cfg.style === "studio" ? "Membership" : "Cost"}</b>{costLine}</span></li>}
                   </ul>
-                  {!chosen && <p className="bk-err">That time may no longer be open — confirming will check it.</p>}
-                  <BookConfirm typeId={type.id} startTime={at} host={host?.email || (type.kind !== "class" && people.length === 1 ? people[0].email : undefined)} style={cfg.style}
-                    signedIn={session.signedIn} loginHref={loginHref} signupHref={signupHref}
-                    insurance={cfg.insurance} area={type.area} cta={cfg.style === "studio" ? "Confirm booking" : cfg.style === "clinic" ? "Book appointment" : "Book consultation"} backHref={href({ day })} />
                   <p className="bk-fine">You can move or cancel it online any time before it starts.</p>
                 </>
               ) : (
                 <div className="bt-pick">
                   <Ic n="cal" size={22} />
-                  <p><b>Pick a time</b> and you&rsquo;ll confirm it here{cfg.style !== "studio" ? " with a few details for us" : ""}.</p>
+                  <p><b>Pick a time</b> and you&rsquo;ll confirm it below{cfg.style !== "studio" ? " with a few details for us" : ""}.</p>
                   {costLine && <p className="bk-fine">{costLine}</p>}
                 </div>
               )}
             </div>
           </aside>
+
+          {at && (
+            <section className="bt-details" id="confirm">
+              <h2><span className="bt-step">2</span>{session.signedIn ? "Confirm" : "Your details"}</h2>
+              {!chosen && <p className="bk-err">That time may no longer be open — confirming will check it.</p>}
+              <BookConfirm typeId={type.id} startTime={at} service={s0?.implicit ? undefined : s0?.name} host={host?.email || (type.kind !== "class" && people.length === 1 ? people[0].email : undefined)} style={cfg.style}
+                signedIn={session.signedIn} loginHref={loginHref} signupHref={signupHref}
+                insurance={cfg.insurance} area={type.area} cta={cfg.style === "studio" ? "Confirm booking" : cfg.style === "clinic" ? "Book appointment" : "Book consultation"} backHref={href({ day })} />
+            </section>
+          )}
         </section>
       </main>
       <SiteFooter />

@@ -19,6 +19,8 @@ export interface Service {
   duration: number; // minutes
   price: number;
   description?: string;
+  /** The definition has no services of its own: it is booked as itself, so no service name is sent. */
+  implicit?: boolean;
 }
 
 /** A booking type (engine: reservation_definition), normalised. */
@@ -38,6 +40,10 @@ export interface BookingType {
   spots: number;
   workDays: string[];
   timezone: string;
+  /** The definition's office hours ("09:00"–"17:00"), in `timezone`. */
+  hours?: { start: string; end: string };
+  /** What the person behind this type practises, when the definition or its team says. */
+  specialty?: string;
   category?: string;
   level?: string;
   room?: string;

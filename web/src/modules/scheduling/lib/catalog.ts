@@ -13,6 +13,25 @@ export function hostEmails(value: any): string[] {
 
 const KINDS: BookingKind[] = ["class", "private", "visit", "consultation", "meeting"];
 
+/** A readable name for a host the definition lists only by email ("maria.lopez08@…" → "Maria Lopez"). */
+function nameFromEmail(email: string): string {
+  return email.split("@")[0].split(/[._\-+]+/).map((w) => w.replace(/\d+/g, "")).filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") || email;
+}
+
+/** The people on a definition: its `team` profiles when it has them, otherwise its hosts as listed
+ *  (an email, or `{ email, name }`), so a type set up with hosts alone still shows who it's with. */
+function teamOf_(d: any): TeamMember[] {
+  const team = (Array.isArray(d.team) ? d.team : []).filter((t: any) => t && t.email && t.name).map((t: any) => ({ ...t, email: str(t.email).toLowerCase() }));
+  if (team.length) return team;
+  const raw = Array.isArray(d.hosts) ? d.hosts : d.hosts && typeof d.hosts === "object" ? [d.hosts] : str(d.hosts).split(",");
+  return hostEmails(d.hosts).map((email) => {
+    const entry = raw.find((h: any) => h && typeof h === "object" && str(h.email ?? h.value).trim().toLowerCase() === email);
+    const name = str(entry?.name || entry?.label || entry?.title).trim();
+    return { email, name: name || nameFromEmail(email) };
+  });
+}
+
 /** A reservation definition → BookingType, or null when it isn't this business's: its
  *  name starts with the setup's prefix, or the setup names it in `include`. */
 export function toBookingType(env: any, prefix: string, include: string[] = []): BookingType | null {
@@ -21,13 +40,16 @@ export function toBookingType(env: any, prefix: string, include: string[] = []):
   if (!env?.sk || !(name.startsWith(prefix) || include.includes(name))) return null;
   if (str(d.status || "active").toLowerCase() !== "active") return null;
   const portal = d.portal || {};
-  const services: Service[] = (Array.isArray(d.services) ? d.services : [])
+  const listed: Service[] = (Array.isArray(d.services) ? d.services : [])
     .filter((s: any) => s && s.name)
     .map((s: any) => ({ name: str(s.name), duration: Number(s.duration) || 30, price: Number(s.price) || 0, description: s.description }));
-  const team: TeamMember[] = (Array.isArray(d.team) ? d.team : [])
-    .filter((t: any) => t && t.email && t.name)
-    .map((t: any) => ({ ...t, email: str(t.email).toLowerCase() }));
-  const kind: BookingKind = KINDS.includes(portal.kind) ? portal.kind : "visit";
+  // A definition without services is booked as itself (the engine uses its name and duration).
+  const services: Service[] = listed.length ? listed : [{ name: str(d.title || name), duration: Number(d.duration) || 30, price: Number(d.price) || 0, implicit: true }];
+  // No hours, no days and no services: a calendar of the team's own meetings, not something to book.
+  const bookable = listed.length > 0 || !!d.officeHours?.startTime || (Array.isArray(d.workDays) && d.workDays.length > 0);
+  const team = teamOf_(d);
+  // No `portal.kind`: a type that seats more than one person at a time is a class.
+  const kind: BookingKind = !bookable ? "meeting" : KINDS.includes(portal.kind) ? portal.kind : Number(d.spots) > 1 && hostEmails(d.hosts).length <= 1 ? "class" : "visit";
   return {
     id: str(env.sk),
     name,
@@ -43,6 +65,8 @@ export function toBookingType(env: any, prefix: string, include: string[] = []):
     spots: Number(d.spots) || 1,
     workDays: Array.isArray(d.workDays) ? d.workDays : [],
     timezone: d.officeHours?.timezone || "America/Chicago",
+    hours: d.officeHours?.startTime && d.officeHours?.endTime ? { start: str(d.officeHours.startTime).slice(0, 5), end: str(d.officeHours.endTime).slice(0, 5) } : undefined,
+    specialty: str(portal.specialty || d.specialty || (Array.isArray(team[0]?.specialties) ? team[0].specialties.join(", ") : "")) || undefined,
     category: portal.category,
     level: portal.level,
     room: portal.room,
@@ -60,6 +84,33 @@ export function teamOf(types: BookingType[]): TeamMember[] {
   const seen = new Map<string, TeamMember>();
   for (const t of types) for (const m of t.team) if (!seen.has(m.email)) seen.set(m.email, m);
   return [...seen.values()];
+}
+
+/** One person who can be booked: a host of a booking type (each doctor or attorney has their own
+ *  definition, with their own hours, zone and services), or the type itself when it has no host. */
+export interface Bookable { type: BookingType; member: TeamMember }
+
+export function bookablesOf(types: BookingType[]): Bookable[] {
+  return types.flatMap((t) => {
+    const hosts = t.team.filter((m) => t.hosts.includes(m.email));
+    return hosts.length ? hosts.map((member) => ({ type: t, member })) : [{ type: t, member: { email: "", name: t.title, photo: t.image } }];
+  });
+}
+
+export const reasonSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+export interface Reason { name: string; slug: string; duration: number; price: number; count: number; description?: string; video: boolean }
+
+/** What people book, across everyone: each service once, with the shortest length, the lowest
+ *  price and how many people offer it. */
+export function reasonsOf(types: BookingType[]): Reason[] {
+  const out = new Map<string, Reason>();
+  for (const t of types) for (const s of t.services) {
+    const r = out.get(s.name);
+    if (r) { r.duration = Math.min(r.duration, s.duration); r.price = Math.min(r.price, s.price); r.count += Math.max(1, t.hosts.length); r.video ||= !!t.video; }
+    else out.set(s.name, { name: s.name, slug: reasonSlug(s.name), duration: s.duration, price: s.price, count: Math.max(1, t.hosts.length), description: s.description || (s.implicit ? t.description : undefined), video: !!t.video });
+  }
+  return [...out.values()];
 }
 
 export function memberOf(types: BookingType[], email?: string): TeamMember | undefined {

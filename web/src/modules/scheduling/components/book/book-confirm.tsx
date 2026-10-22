@@ -9,6 +9,8 @@ export interface ConfirmProps {
   typeId: string;
   startTime: string;
   host?: string;
+  /** The visit type (the definition's service) being booked. */
+  service?: string;
   style: "studio" | "clinic" | "firm";
   signedIn: boolean;
   loginHref: string;
@@ -38,7 +40,7 @@ export function BookConfirm(p: ConfirmProps) {
     setErr(null);
     const intake: Record<string, string> =
       p.style === "clinic" ? { reason, insurance } : p.style === "firm" ? { reason, area: p.area || "", opposingParty: other } : {};
-    const r = await bookAction({ typeId: p.typeId, startTime: p.startTime, host: p.host, intake, guest: p.signedIn ? undefined : { name, email, phone } });
+    const r = await bookAction({ typeId: p.typeId, startTime: p.startTime, host: p.host, service: p.service, intake, guest: p.signedIn ? undefined : { name, email, phone } });
     if (r.ok) {
       if (r.guest) router.push(`/book/manage?email=${encodeURIComponent(r.guest.email)}&n=${encodeURIComponent(r.number)}&booked=1`);
       else router.push(`/account/scheduling/${r.id}?booked=1`);
@@ -53,42 +55,56 @@ export function BookConfirm(p: ConfirmProps) {
     <div className="bk-cta">
       {!p.signedIn && (
         <>
-          <p className="bk-cta-note">Have an account? <Link href={p.loginHref}>Sign in</Link> and it lands in your bookings. Or book with your details:</p>
-          <label className="bk-lbl" htmlFor="bk-name">Full name</label>
-          <input id="bk-name" className="bk-in" autoComplete="name" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />
-          <label className="bk-lbl" htmlFor="bk-email">Email</label>
-          <input id="bk-email" className="bk-in" type="email" autoComplete="email" maxLength={200} value={email} onChange={(e) => setEmail(e.target.value)} />
-          <label className="bk-lbl" htmlFor="bk-phone">Mobile <span className="bk-opt">(optional, for a text reminder)</span></label>
-          <input id="bk-phone" className="bk-in" type="tel" autoComplete="tel" maxLength={40} value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <p className="bk-cta-note bk-span">Have an account? <Link href={p.loginHref}>Sign in</Link> and it lands in your bookings. Or book with your details:</p>
+          <div className="bk-fld">
+            <label className="bk-lbl" htmlFor="bk-name">Full name</label>
+            <input id="bk-name" className="bk-in" autoComplete="name" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="bk-fld">
+            <label className="bk-lbl" htmlFor="bk-email">Email</label>
+            <input id="bk-email" className="bk-in" type="email" autoComplete="email" maxLength={200} value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="bk-fld">
+            <label className="bk-lbl" htmlFor="bk-phone">Mobile <span className="bk-opt">(optional, for a text reminder)</span></label>
+            <input id="bk-phone" className="bk-in" type="tel" autoComplete="tel" maxLength={40} value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
         </>
       )}
       {p.style === "clinic" && (
         <>
-          <label className="bk-lbl" htmlFor="bk-reason">What&rsquo;s the visit for?</label>
-          <textarea id="bk-reason" className="bk-in" rows={3} maxLength={600} placeholder="A few words for your clinician" value={reason} onChange={(e) => setReason(e.target.value)} />
           {p.insurance?.length ? (
-            <>
+            <div className="bk-fld">
               <label className="bk-lbl" htmlFor="bk-ins">Insurance</label>
               <select id="bk-ins" className="bk-in" value={insurance} onChange={(e) => setInsurance(e.target.value)}>
                 <option value="">Choose your plan</option>
                 {p.insurance.map((i) => <option key={i} value={i}>{i}</option>)}
               </select>
-            </>
+            </div>
           ) : null}
+          <div className="bk-fld bk-span">
+            <label className="bk-lbl" htmlFor="bk-reason">What&rsquo;s the visit for?</label>
+            <textarea id="bk-reason" className="bk-in" rows={3} maxLength={600} placeholder="A few words for your clinician" value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
         </>
       )}
       {p.style === "firm" && (
         <>
-          <label className="bk-lbl" htmlFor="bk-reason">What do you need help with?</label>
-          <textarea id="bk-reason" className="bk-in" rows={4} maxLength={1500} placeholder="A short summary: what happened, and what you’d like to achieve" value={reason} onChange={(e) => setReason(e.target.value)} />
-          <label className="bk-lbl" htmlFor="bk-other">Other people or companies involved</label>
-          <input id="bk-other" className="bk-in" maxLength={300} placeholder="For our conflict check" value={other} onChange={(e) => setOther(e.target.value)} />
-          <p className="bk-fine">Booking a consultation doesn&rsquo;t create an attorney&ndash;client relationship. Everything you send is kept confidential.</p>
+          <div className="bk-fld bk-span">
+            <label className="bk-lbl" htmlFor="bk-reason">What do you need help with?</label>
+            <textarea id="bk-reason" className="bk-in" rows={4} maxLength={1500} placeholder="A short summary: what happened, and what you’d like to achieve" value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+          <div className="bk-fld bk-span">
+            <label className="bk-lbl" htmlFor="bk-other">Other people or companies involved</label>
+            <input id="bk-other" className="bk-in" maxLength={300} placeholder="For our conflict check" value={other} onChange={(e) => setOther(e.target.value)} />
+          </div>
+          <p className="bk-fine bk-span">Booking a consultation doesn&rsquo;t create an attorney&ndash;client relationship. Everything you send is kept confidential.</p>
         </>
       )}
-      {err && <div className="bk-err" role="alert">{err}{taken && <> <Link href={p.backHref || "?"}>Pick another time</Link></>}</div>}
-      <button type="button" className="btn clay lg bk-wide" disabled={pending} onClick={submit}>{pending ? "Booking…" : p.cta}</button>
-      {!p.signedIn && <p className="bk-fine">We&rsquo;ll email you the confirmation and your booking number. <Link href={p.signupHref}>Create an account</Link> to keep every booking in one place.</p>}
+      {err && <div className="bk-err bk-span" role="alert">{err}{taken && <> <Link href={p.backHref || "?"}>Pick another time</Link></>}</div>}
+      <div className="bk-go bk-span">
+        <button type="button" className="btn clay lg" disabled={pending} onClick={submit}>{pending ? "Booking…" : p.cta}</button>
+        {!p.signedIn && <p className="bk-fine">We&rsquo;ll email you the confirmation and your booking number. <Link href={p.signupHref}>Create an account</Link> to keep every booking in one place.</p>}
+      </div>
     </div>
   );
 }

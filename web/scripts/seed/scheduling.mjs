@@ -2,9 +2,9 @@
 /**
  * Seed the three Scheduling setups on an org so every screen has a real business behind it:
  *
- *   Cedar Family Medicine (medical-)  five clinicians, seven visit types, three intake forms,
- *                                     and two weeks of other patients' visits, so each
- *                                     clinician's open times are their own.
+ *   Cedar Family Medicine (medical-)  four doctors, each the host of their own booking definition
+ *                                     (own time zone, days, hours and visit types as services),
+ *                                     intake forms, and two weeks of other patients' visits.
  *   Lumen Pilates (studio-)           five coaches, a weekly class timetable (reformer, tower,
  *                                     mat, jumpboard, weekend flow), private sessions, packs
  *                                     and memberships, and the members already in each class.
@@ -37,8 +37,10 @@ const API = (process.env.APPENGINE || "http://127.0.0.1:3300").replace(/\/$/, ""
 const ORG = process.env.ORG || "demo";
 const argv = process.argv.slice(2);
 const ONLY = argv.includes("--only") ? String(argv[argv.indexOf("--only") + 1] || "").split(",").filter(Boolean) : ["medical", "studio", "law"];
-const LOAD = !argv.includes("--no-load");
+const LOAD = !argv.includes("--no-load") && !argv.includes("--types-only");
 const ALLOW_AUTOMATIONS = argv.includes("--allow-automations");
+// --types-only: just the booking types (no forms, plans or bookings), for a sign-in that can only write those.
+const TYPES_ONLY = argv.includes("--types-only");
 const TZ = "America/Chicago";
 
 const U = (id, w = 900) => `https://images.unsplash.com/${id}?w=${w}&q=75&auto=format&fit=crop`;
@@ -58,78 +60,56 @@ const CEDAR = {
     email: "rohan.mehta@cedar-family.example.com", name: "Dr. Rohan Mehta", title: "Family physician", credentials: "DO",
     photo: FACE("photo-1612349317150-e413f6a5b16d"), languages: ["English", "Hindi", "Gujarati"],
     specialties: ["Sports and joint injuries", "Preventive care", "Men's health"],
-    bio: "Dr. Mehta is an osteopathic physician who also covers the Dallas Running Club medical tent. Sprains, back pain and a check-up you've put off for three years are all his.",
+    bio: "Dr. Mehta is an osteopathic physician who sees Cedar patients in person and by video from the New York office. Sprains, back pain and a check-up you've put off for three years are all his.",
   },
   chen: {
     email: "laura.chen@cedar-family.example.com", name: "Dr. Laura Chen", title: "Family physician", credentials: "MD",
     photo: FACE("photo-1559839734-2b71ea197ec2"), languages: ["English", "Mandarin"],
     specialties: ["Medicare and older adults", "Thyroid", "Women's health"],
-    bio: "Dr. Chen sees many of the practice's Medicare patients and their adult children. Annual wellness visits, medication reviews and coordinating with specialists.",
+    bio: "Dr. Chen works from Denver and sees many of the practice's Medicare patients and their adult children. Annual wellness visits, medication reviews and coordinating with specialists.",
   },
   alvarez: {
     email: "sofia.alvarez@cedar-family.example.com", name: "Sofia Alvarez", title: "Physician assistant", credentials: "PA-C",
     photo: FACE("photo-1594824476967-48c8b964273f"), languages: ["English", "Spanish"],
     specialties: ["Kids and teens", "Sports physicals", "Same-day sick visits"],
-    bio: "Sofia sees most of the practice's children, from newborn checks to high-school sports physicals, and keeps the same-day sick schedule moving.",
-  },
-  bell: {
-    email: "marcus.bell@cedar-family.example.com", name: "Marcus Bell", title: "Nurse practitioner", credentials: "FNP-C",
-    photo: FACE("photo-1622253692010-333f2da6031d"), languages: ["English"],
-    specialties: ["Colds, flu and infections", "Video visits", "Follow-ups"],
-    bio: "Marcus runs the practice's video visits, including Saturday mornings, and the quick in-person sick visits during the week.",
+    bio: "Sofia sees most of the practice's children, from newborn checks to high-school sports physicals, and keeps the same-day sick schedule moving from Los Angeles.",
   },
 };
 const C = CEDAR;
 const host = (p) => ({ email: p.email, name: p.name });
 
 const LUNCH = [{ startTime: "12:00", endTime: "13:00", label: "Lunch" }];
-const clinicDef = (o) => ({
-  name: `medical-${o.slug}`, title: o.title, description: o.description, type: "service", status: "active",
-  services: [{ name: o.title, duration: o.duration, price: o.price, breakAfter: o.breakAfter ?? 0, description: o.description }],
-  hosts: o.people.map(host), team: o.people, spots: o.people.length,
-  ...(o.roundRobin ? { bookingType: "round-robin" } : {}),
-  workDays: o.days || WEEK, officeHours: { timezone: TZ, startTime: o.start || "08:00", endTime: o.end || "17:00" },
-  blockedTime: o.blocked ?? LUNCH, form: o.form, image: o.image ? { url: o.image } : undefined,
-  portal: { kind: "visit", category: o.category, video: !!o.video, sameDay: !!o.sameDay },
+
+/** Visit types, as services on each doctor's own booking definition. */
+const VISIT = {
+  newPatient: { name: "New patient visit", duration: 45, breakAfter: 15, price: 195, description: "Your first visit with the doctor who'll be yours: your history, medicines and what you want help with, and a plan." },
+  physical: { name: "Annual physical", duration: 40, breakAfter: 20, price: 175, description: "Blood pressure, labs, the screenings due for your age and the vaccines you're behind on." },
+  sick: { name: "Sick visit", duration: 20, price: 95, description: "Fever, cough, sore throat, an earache or a rash. Same-day times every morning." },
+  followUp: { name: "Follow-up visit", duration: 20, price: 85, description: "Check in on a condition, a new medicine or lab results." },
+  wellChild: { name: "Well-child & sports physical", duration: 30, price: 110, description: "Growth, development and vaccines, and the signed UIL form for school sports." },
+  womens: { name: "Women's health visit", duration: 30, breakAfter: 10, price: 140, description: "Pap smear, birth control, menopause and breast health." },
+  video: { name: "Video visit", duration: 15, price: 59, description: "From your phone: colds, rashes, refills and follow-ups." },
+};
+
+/** Each doctor is the host of their own booking definition: their own time zone, days and
+ *  hours, and the visit types they see as its services. */
+const doctorDef = (slug, p, o) => ({
+  name: `medical-${slug}`, title: p.name, description: p.bio, type: "service", status: "active",
+  services: o.visits, hosts: [host(p)], team: [p], spots: 1,
+  workDays: o.days, officeHours: { timezone: o.tz, startTime: o.start, endTime: o.end }, blockedTime: o.blocked ?? LUNCH,
+  form: "medical-intake", image: { url: p.photo },
+  portal: { kind: "visit", specialty: p.specialties.join(", "), video: o.visits.includes(VISIT.video), sameDay: o.visits.includes(VISIT.sick) },
 });
 
 const MEDICAL_TYPES = [
-  clinicDef({
-    slug: "new-patient", title: "New patient visit", duration: 45, breakAfter: 15, price: 195, category: "Get started", form: "medical-new-patient",
-    people: [C.okafor, C.mehta, C.chen],
-    description: "Your first visit with the doctor who'll be yours. We go through your history, medicines and what you want help with, and agree a plan.",
-  }),
-  clinicDef({
-    slug: "annual-physical", title: "Annual physical", duration: 40, breakAfter: 20, price: 175, category: "Prevention", form: "medical-intake", end: "16:00",
-    people: [C.okafor, C.mehta, C.chen, C.alvarez],
-    description: "A yearly check-up: blood pressure, labs, screenings due for your age and the vaccines you're behind on. Covered in full by most plans.",
-  }),
-  clinicDef({
-    slug: "sick-visit", title: "Sick visit", duration: 20, price: 95, category: "Same day", form: "medical-intake", sameDay: true, roundRobin: true,
-    people: [C.alvarez, C.bell, C.mehta],
-    description: "Fever, cough, sore throat, an earache or a rash. Same-day times open every morning.",
-  }),
-  clinicDef({
-    slug: "follow-up", title: "Follow-up visit", duration: 20, price: 85, category: "Ongoing care", form: "medical-intake",
-    people: [C.okafor, C.mehta, C.chen, C.alvarez, C.bell],
-    description: "Check in on a condition, a new medicine or lab results with the clinician you saw last.",
-  }),
-  clinicDef({
-    slug: "well-child", title: "Well-child & sports physical", duration: 30, price: 110, category: "Kids & teens", form: "medical-well-child", start: "08:00", end: "17:00",
-    people: [C.alvarez, C.okafor],
-    description: "Growth, development and vaccines for newborns to teens, and the signed UIL form for school sports.",
-  }),
-  clinicDef({
-    slug: "womens-health", title: "Women's health visit", duration: 30, breakAfter: 10, price: 140, category: "Prevention", form: "medical-intake",
-    people: [C.okafor, C.chen],
-    description: "Pap smear, birth control, menopause and breast health with a doctor you choose.",
-  }),
-  clinicDef({
-    slug: "video-visit", title: "Video visit", duration: 15, price: 59, category: "From home", form: "medical-intake", video: true, roundRobin: true,
-    days: [...WEEK, "Saturday"], start: "08:00", end: "18:00", blocked: [],
-    people: [C.bell, C.alvarez],
-    description: "See a clinician from your phone for colds, rashes, refills and follow-ups. Saturday mornings too.",
-  }),
+  doctorDef("okafor", C.okafor, { tz: "America/Chicago", days: ["Monday", "Tuesday", "Wednesday", "Thursday"], start: "08:00", end: "16:00",
+    visits: [VISIT.newPatient, VISIT.physical, VISIT.womens, VISIT.followUp] }),
+  doctorDef("mehta", C.mehta, { tz: "America/New_York", days: ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], start: "09:00", end: "17:00",
+    visits: [VISIT.newPatient, VISIT.physical, VISIT.sick, VISIT.followUp, VISIT.video] }),
+  doctorDef("chen", C.chen, { tz: "America/Denver", days: ["Monday", "Wednesday", "Friday"], start: "07:30", end: "15:30",
+    visits: [VISIT.newPatient, VISIT.physical, VISIT.womens, VISIT.followUp, VISIT.video] }),
+  doctorDef("alvarez", C.alvarez, { tz: "America/Los_Angeles", days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], start: "10:00", end: "18:00", blocked: [{ startTime: "13:30", endTime: "14:15", label: "Lunch" }],
+    visits: [VISIT.wellChild, VISIT.sick, VISIT.followUp, VISIT.video] }),
 ];
 
 const str = (title, extra = {}) => ({ type: "string", title, ...extra });
@@ -475,6 +455,7 @@ async function book(def, saved, start, end, who, hostEmail, source, extra = {}) 
 /* ───────────── each setup ───────────── */
 
 async function seedTypes(label, types, forms, plans = []) {
+  if (TYPES_ONLY) { forms = []; plans = []; types = types.map(({ form, ...t }) => t); }
   for (const f of forms) await upsert("crm_form", f);
   const saved = {};
   for (const t of types) saved[t.name] = await upsert("reservation_definition", t);
@@ -501,14 +482,14 @@ async function loadAppointments(label, types, saved, load, source, days = 10) {
       const close = Math.max(...open.map((d) => mins(d.officeHours.endTime)));
       while (t < close) {
         const def = open[Math.floor(r() * open.length)];
-        const svc = def.services[0], step = svc.duration + (svc.breakAfter || 0);
+        const svc = def.services[Math.floor(r() * def.services.length)], step = svc.duration + (svc.breakAfter || 0);
         const startM = mins(def.officeHours.startTime);
         const aligned = startM + Math.ceil(Math.max(0, t - startM) / step) * step;
         if (aligned + svc.duration > mins(def.officeHours.endTime) || blockedAt(def, aligned, aligned + svc.duration)) { t = aligned + step; continue; }
         if (r() < share) {
-          const start = zoned(key, hhmm(aligned)), end = new Date(start.getTime() + svc.duration * 60000);
+          const start = zoned(key, hhmm(aligned), def.officeHours.timezone), end = new Date(start.getTime() + svc.duration * 60000);
           if (start.getTime() > now + 30 * 60000 && !have.has(`${email}|${start.toISOString()}`)) {
-            await book(def, saved[def.name], start, end, person(r), email, source);
+            await book(def, saved[def.name], start, end, person(r), email, source, { service: svc.name, serviceName: svc.name });
             have.set(`${email}|${start.toISOString()}`, 1);
             made++;
           }
@@ -535,7 +516,7 @@ async function loadClasses(types, saved, source, days = 10) {
       if (!def.workDays.includes(wd)) continue;
       for (let m = mins(def.officeHours.startTime); m + svc.duration <= mins(def.officeHours.endTime); m += step) {
         if (blockedAt(def, m, m + svc.duration)) continue;
-        const start = zoned(key, hhmm(m));
+        const start = zoned(key, hhmm(m), def.officeHours.timezone);
         if (start.getTime() < now + 60 * 60000) continue;
         const r = rng(`${source}|${def.name}|${key}|${m}`);
         // Early mornings and evenings fill; mid-day and far-off days are lighter.
@@ -570,7 +551,7 @@ async function main() {
   if (ONLY.includes("medical")) {
     const saved = await seedTypes("Cedar Family Medicine", MEDICAL_TYPES, MEDICAL_FORMS);
     if (LOAD) await loadAppointments("Cedar Family Medicine", MEDICAL_TYPES, saved, {
-      [C.okafor.email]: 0.7, [C.chen.email]: 0.55, [C.mehta.email]: 0.45, [C.alvarez.email]: 0.4, [C.bell.email]: 0.25,
+      [C.okafor.email]: 0.7, [C.chen.email]: 0.5, [C.mehta.email]: 0.4, [C.alvarez.email]: 0.3,
     }, "seed:cedar");
   }
   if (ONLY.includes("studio")) {

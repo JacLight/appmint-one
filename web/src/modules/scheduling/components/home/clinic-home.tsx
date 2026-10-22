@@ -2,33 +2,40 @@ import Link from "next/link";
 import type { Setup } from "@/setups/types";
 import type { SchedulingConfig } from "@/setups/scheduling-config";
 import { availability, bookingTypes } from "../../lib/data";
-import { teamOf } from "../../lib/catalog";
-import { dayKey, duration, money, relDay, time } from "../../lib/format";
-import type { BookingType, Slot, TeamMember } from "../../lib/types";
+import { bookablesOf, reasonsOf, type Bookable } from "../../lib/catalog";
+import { dayKey, duration, money, relDay, time, zoneName } from "../../lib/format";
+import type { Slot } from "../../lib/types";
 import { Empty, Ic, Img } from "../bits";
 import { VisitBlock } from "../visit-block";
 
-/** For each clinician, the first visit type they see and their next open times. */
-async function nextByClinician(types: BookingType[], people: TeamMember[], tz: string) {
+/** Each clinician's next open times (the first day that has any, up to four), in their own zone. */
+async function nextByClinician(people: Bookable[]) {
   const now = Date.now();
-  return Promise.all(people.map(async (m) => {
-    const type = types.find((t) => t.hosts.includes(m.email));
-    if (!type) return { m, type: undefined as BookingType | undefined, slots: [] as Slot[] };
-    const a = await availability(type, { days: 7, host: m.email });
+  return Promise.all(people.map(async (b) => {
+    const tz = b.type.timezone;
+    const a = await availability(b.type, { days: 7, host: b.member.email || undefined });
     const slots = (a?.days || []).flatMap((d) => d.slots || []).filter((s) => s.spotsAvailable > 0 && Date.parse(s.startTime) > now);
-    // The chips show the first day with times: up to four of them.
     const first = slots[0] ? dayKey(slots[0].startTime, tz) : "";
-    return { m, type, slots: slots.filter((s) => dayKey(s.startTime, tz) === first).slice(0, 4) };
+    return { ...b, tz, slots: slots.filter((s) => dayKey(s.startTime, tz) === first).slice(0, 4) as Slot[] };
   }));
 }
+
+/** Where a time with this person is booked. */
+const at = (b: Bookable, iso?: string) => {
+  const u = new URLSearchParams();
+  if (iso) u.set("at", iso);
+  if (b.member.email) u.set("with", b.member.email);
+  const q = u.toString();
+  return `/book/${b.type.slug}${q ? `?${q}` : ""}`;
+};
 
 /** Cedar's home books a visit: pick a visit type (and a clinician), see who is free
  *  soonest, then the visit types, insurance and the practice itself. */
 export async function ClinicHome({ setup, cfg }: { setup: Setup; cfg: SchedulingConfig }) {
-  const tz = cfg.timezone;
-  const types = (await bookingTypes()).filter((t) => !t.hidden);
-  const people = teamOf(types);
-  const next = await nextByClinician(types, people, tz);
+  const types = (await bookingTypes()).filter((t) => !t.hidden && t.kind !== "meeting" && t.kind !== "class");
+  const people = bookablesOf(types);
+  const reasons = reasonsOf(types);
+  const next = await nextByClinician(people);
   const soonest = next.filter((n) => n.slots[0]).sort((a, b) => a.slots[0].startTime.localeCompare(b.slots[0].startTime))[0];
 
   return (
@@ -42,27 +49,28 @@ export async function ClinicHome({ setup, cfg }: { setup: Setup; cfg: Scheduling
             <form className="cl-find" action="/book" method="get">
               <label>
                 <span>Reason for visit</span>
-                <select name="type" defaultValue={types[0]?.slug || ""} disabled={!types.length}>
-                  {types.length ? types.map((t) => <option key={t.id} value={t.slug}>{t.title} · {duration(t.services[0]?.duration || 0)}</option>) : <option value="">Online booking opens soon</option>}
+                <select name="reason" defaultValue="" disabled={!reasons.length}>
+                  <option value="">Any reason</option>
+                  {reasons.map((r) => <option key={r.slug} value={r.slug}>{r.name} · {duration(r.duration)}</option>)}
                 </select>
               </label>
               <label>
                 <span>Clinician</span>
-                <select name="with" defaultValue="" disabled={!people.length}>
-                  <option value="">First available</option>
-                  {people.map((m) => <option key={m.email} value={m.email}>{m.name}</option>)}
+                <select name="type" defaultValue="" disabled={!people.length}>
+                  <option value="">Any clinician</option>
+                  {people.map((b) => <option key={`${b.type.id}:${b.member.email}`} value={b.type.slug}>{b.member.name}</option>)}
                 </select>
               </label>
-              <button type="submit" className="btn clay lg" disabled={!types.length}>{cfg.hero.cta} <Ic n="arrow" size={17} /></button>
+              <button type="submit" className="btn clay lg" disabled={!people.length}>{cfg.hero.cta} <Ic n="arrow" size={17} /></button>
             </form>
             {cfg.lines && <ul className="cl-lines">{cfg.lines.map((l) => <li key={l}><Ic n="check" size={16} /> {l}</li>)}</ul>}
           </div>
           <div className="cl-hero-r">
             <Img src={cfg.hero.image} alt={cfg.hero.imageAlt} w={1200} />
-            {soonest && soonest.type && (
-              <Link className="cl-soon" href={`/book/${soonest.type.slug}?at=${encodeURIComponent(soonest.slots[0].startTime)}&with=${encodeURIComponent(soonest.m.email)}`}>
-                <span className="cl-soon-ph"><Img src={soonest.m.photo} alt="" w={160} /></span>
-                <span><small>Next available</small><b>{relDay(soonest.slots[0].startTime, tz)} · {time(soonest.slots[0].startTime, tz)}</b><i>{soonest.m.name}</i></span>
+            {soonest && (
+              <Link className="cl-soon" href={at(soonest, soonest.slots[0].startTime)}>
+                <span className="cl-soon-ph"><Img src={soonest.member.photo} alt="" w={160} /></span>
+                <span><small>Next available</small><b>{relDay(soonest.slots[0].startTime, soonest.tz)} · {time(soonest.slots[0].startTime, soonest.tz)}</b><i>{soonest.member.name}</i></span>
               </Link>
             )}
             {!soonest && cfg.place.phone && (
@@ -79,46 +87,44 @@ export async function ClinicHome({ setup, cfg }: { setup: Setup; cfg: Scheduling
         <div className="sc-head"><h2>{cfg.words.team}</h2>{people.length > 0 && <Link className="sc-more" href="/team">All clinicians <Ic n="arrow" size={16} /></Link>}</div>
         {people.length ? (
           <div className="cl-docs">
-            {next.map(({ m, type, slots }) => (
-              <article key={m.email} className="cl-doc">
+            {next.map((b) => (
+              <article key={`${b.type.id}:${b.member.email}`} className="cl-doc">
                 <div className="cl-doc-top">
-                  <span className="cl-doc-ph"><Img src={m.photo} alt={m.name} w={300} /></span>
+                  <span className="cl-doc-ph"><Img src={b.member.photo} alt={b.member.name} w={300} /></span>
                   <div>
-                    <h3>{m.name}</h3>
-                    <p className="cl-doc-t">{m.title}</p>
-                    {m.languages?.length ? <p className="cl-doc-l">Speaks {m.languages.join(", ")}</p> : null}
+                    <h3>{b.member.name}</h3>
+                    <p className="cl-doc-t">{b.member.specialties?.join(", ") || b.type.specialty || b.member.title || (b.member.email ? b.type.title : "")}</p>
+                    <p className="cl-doc-l">{zoneName(b.tz)}{b.member.languages?.length ? ` · Speaks ${b.member.languages.join(", ")}` : ""}</p>
                   </div>
                 </div>
-                {type && (
-                  <div className="cl-doc-times">
-                    <p>{slots.length ? <>{relDay(slots[0].startTime, tz)} · {type.title}</> : <>No openings this week for {type.title.toLowerCase()}</>}</p>
-                    <div className="cl-chips">
-                      {slots.map((s) => <Link key={s.startTime} className="cl-chip" href={`/book/${type.slug}?at=${encodeURIComponent(s.startTime)}&with=${encodeURIComponent(m.email)}`}>{time(s.startTime, tz)}</Link>)}
-                      <Link className="cl-chip more" href={`/book/${type.slug}?with=${encodeURIComponent(m.email)}`}>{slots.length ? "More" : "See next week"}</Link>
-                    </div>
+                <div className="cl-doc-times">
+                  <p>{b.slots.length ? <>Next open · {relDay(b.slots[0].startTime, b.tz)}</> : <>No openings this week</>}</p>
+                  <div className="cl-chips">
+                    {b.slots.map((s) => <Link key={s.startTime} className="cl-chip" href={at(b, s.startTime)}>{time(s.startTime, b.tz)}</Link>)}
+                    <Link className="cl-chip more" href={`/book?type=${b.type.slug}${b.member.email ? `&with=${encodeURIComponent(b.member.email)}` : ""}`}>{b.slots.length ? "All times" : "Next week"}</Link>
                   </div>
-                )}
+                </div>
               </article>
             ))}
           </div>
         ) : (
-          <Empty title="Online booking opens soon" action={cfg.place.phone ? <a className="btn clay sm" href={`tel:${cfg.place.phone.replace(/[^0-9+]/g, "")}`}><Ic n="phone" size={16} /> Call {cfg.place.phone}</a> : undefined}>
+          <Empty title="No clinicians take online bookings yet" action={cfg.place.phone ? <a className="btn clay sm" href={`tel:${cfg.place.phone.replace(/[^0-9+]/g, "")}`}><Ic n="phone" size={16} /> Call {cfg.place.phone}</a> : undefined}>
             Our clinicians&rsquo; calendars aren&rsquo;t online yet. Call the front desk and we&rsquo;ll find you a time this week.
           </Empty>
         )}
       </section>
 
-      {types.length > 0 && (
+      {reasons.length > 0 && (
         <section className="cl-types-band">
           <div className="wrap">
             <div className="sc-head"><h2>{cfg.words.types}</h2><p>Prices are for patients paying for themselves. With insurance, you pay your plan&rsquo;s copay.</p></div>
             <div className="cl-types">
-              {types.map((t) => (
-                <Link key={t.id} href={`/book?type=${t.slug}`} className="cl-type">
-                  <span className="cl-type-ic"><Ic n={t.video ? "video" : t.sameDay ? "clock" : "doc"} /></span>
-                  <span className="cl-type-t">{t.title}</span>
-                  <span className="cl-type-d">{t.description}</span>
-                  <span className="cl-type-m">{duration(t.services[0]?.duration || 0)}{t.price ? ` · Self-pay ${money(t.price)}` : ""}{t.video ? " · From home" : ""}</span>
+              {reasons.map((r) => (
+                <Link key={r.slug} href={`/book?reason=${r.slug}`} className="cl-type">
+                  <span className="cl-type-ic"><Ic n={r.video ? "video" : "doc"} /></span>
+                  <span className="cl-type-t">{r.name}</span>
+                  {r.description && <span className="cl-type-d">{r.description}</span>}
+                  <span className="cl-type-m">{duration(r.duration)}{r.price ? ` · Self-pay from ${money(r.price)}` : ""} · {r.count} {r.count === 1 ? "clinician" : "clinicians"}</span>
                 </Link>
               ))}
             </div>

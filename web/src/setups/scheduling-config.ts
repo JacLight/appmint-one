@@ -21,7 +21,8 @@ export interface SchedulingPlace {
 
 export interface SchedulingConfig {
   style: SchedulingStyle;
-  /** Booking types (reservation definitions) whose `name` starts with this. */
+  /** Booking types (reservation definitions) whose `name` starts with this, for an org that
+   *  holds several businesses' types. When none match, every active type in the org is shown. */
   prefix: string;
   /** Existing booking types (reservation definition names) this business also offers. */
   include?: string[];

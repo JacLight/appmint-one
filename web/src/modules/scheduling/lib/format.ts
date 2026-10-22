@@ -74,3 +74,36 @@ export const statusLabel = (s: string) => {
   const v = String(s || "").toLowerCase();
   return ({ new: "Booked", pending: "Requested", confirmed: "Confirmed", completed: "Completed", cancelled: "Cancelled", canceled: "Cancelled", no_show: "Missed", rescheduled: "Rescheduled", used: "Attended" } as Record<string, string>)[v] || (v ? v[0].toUpperCase() + v.slice(1) : "");
 };
+
+/** "Central Time" for "America/Chicago": the zone a person's times are shown in. */
+export function zoneName(tz: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "longGeneric" }).formatToParts(new Date()).find((p) => p.type === "timeZoneName")?.value || tz;
+  } catch {
+    return tz;
+  }
+}
+
+const WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/** Working days as people say them: ["Monday"…"Friday"] → "Mon–Fri"; gaps → "Mon, Wed, Fri". */
+export function daysLine(days: string[]): string {
+  const idx = [...new Set(days.map((d) => WEEK.findIndex((w) => w.toLowerCase() === String(d).toLowerCase())).filter((i) => i >= 0))].sort((a, b) => a - b);
+  if (!idx.length) return "";
+  const runs: number[][] = [];
+  for (const i of idx) { const r = runs[runs.length - 1]; if (r && i === r[r.length - 1] + 1) r.push(i); else runs.push([i]); }
+  const ab = (i: number) => WEEK[i].slice(0, 3);
+  return runs.map((r) => (r.length >= 3 ? `${ab(r[0])}–${ab(r[r.length - 1])}` : r.map(ab).join(", "))).join(", ");
+}
+
+/** "09:00" → "9:00 AM". */
+export function clock(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (Number.isNaN(h)) return hhmm;
+  return `${((h + 11) % 12) + 1}:${String(m || 0).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/** The hour (0–23) of an instant on the clock in `tz`. */
+export function hourOf(iso: string, tz: string): number {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }).format(new Date(iso))) % 24;
+}

@@ -25,13 +25,21 @@ export async function getConfig(): Promise<SchedulingConfig | null> {
 
 // ───────── public: booking types, times, plans ─────────
 
-/** This business's booking types: GET crm/reservations/definitions (public), active,
- *  named with the setup's prefix or listed in its `include`. One call per request. */
-export const bookingTypes = cache(async (): Promise<BookingType[]> => {
+/** This business's booking types: GET crm/reservations/definitions (public), active.
+ *  When the org holds several businesses' types, the setup's prefix (and `include`) picks
+ *  this one's; when none carry it, every active type the org has is this business's.
+ *  One call per request. */
+export const bookingTypes = cache(async (): Promise<BookingType[]> => (await loadBookingTypes()).types);
+
+/** The same, saying whether the engine answered, so a page can tell "nothing to book" from
+ *  "couldn't ask". */
+export const loadBookingTypes = cache(async (): Promise<{ types: BookingType[]; ok: boolean }> => {
   const cfg = await getConfig();
-  if (!cfg) return [];
-  const r = await R.listDefinitions().catch(() => []);
-  return r.map((d) => toBookingType(d, cfg.prefix, cfg.include)).filter(Boolean) as BookingType[];
+  if (!cfg) return { types: [], ok: true };
+  let ok = true;
+  const r = await R.listDefinitions().catch(() => ((ok = false), []));
+  const mine = r.map((d) => toBookingType(d, cfg.prefix, cfg.include)).filter(Boolean) as BookingType[];
+  return { ok, types: mine.length ? mine : (r.map((d) => toBookingType(d, "")).filter(Boolean) as BookingType[]) };
 });
 
 export async function bookingType(slug: string): Promise<BookingType | null> {
@@ -39,12 +47,19 @@ export async function bookingType(slug: string): Promise<BookingType | null> {
   return all.find((t) => t.slug === slug || t.name === slug || t.id === slug) || null;
 }
 
+/** The service name the engine is asked about: the one chosen, else the type's first; none for a
+ *  type booked as itself. */
+export function serviceName(type: BookingType, wanted?: string): string | undefined {
+  const s = type.services.find((x) => x.name === wanted) || type.services[0];
+  return s && !s.implicit ? s.name : undefined;
+}
+
 /** Open times for a booking type, `days` days from `from` (YYYY-MM-DD, business zone):
  *  POST crm/reservations/availability (public). `exclude` is the booking being moved. */
 export async function availability(type: BookingType, opts: { from?: string; days?: number; host?: string; service?: string; exclude?: string } = {}): Promise<Availability | null> {
   try {
     const r: any = await R.getAvailability({
-      reservationDefinitionId: type.id, serviceName: opts.service || type.services[0]?.name, from: opts.from,
+      reservationDefinitionId: type.id, serviceName: serviceName(type, opts.service), from: opts.from,
       days: Math.min(31, Math.max(1, opts.days || 7)), host: opts.host, excludeReservationId: opts.exclude,
     });
     if (!r || !Array.isArray(r.days)) return null;

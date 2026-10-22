@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getSetup } from "@/lib/setup";
 import { StudioSchedule } from "@/modules/scheduling/components/book/studio-schedule";
 import { FindTime } from "@/modules/scheduling/components/book/find-time";
+import { BookPageSkeleton } from "@/modules/scheduling/components/book/skeleton";
 
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSetup();
@@ -21,9 +23,12 @@ export default async function BookPage({ searchParams }: { searchParams: SP }) {
     <>
       <SiteHeader />
       <main>
-        {cfg.style === "studio"
-          ? <StudioSchedule cfg={cfg} day={one(sp.day)} type={one(sp.type)} />
-          : <FindTime cfg={cfg} type={one(sp.type)} with={one(sp.with)} from={one(sp.from)} />}
+        {/* The header shows at once; the doctors and their times stream in behind a skeleton. */}
+        <Suspense fallback={<BookPageSkeleton style={cfg.style} />}>
+          {cfg.style === "studio"
+            ? <StudioSchedule cfg={cfg} day={one(sp.day)} type={one(sp.type)} />
+            : <FindTime cfg={cfg} type={one(sp.type)} reason={one(sp.reason)} with={one(sp.with)} from={one(sp.from)} />}
+        </Suspense>
       </main>
       <SiteFooter />
     </>
