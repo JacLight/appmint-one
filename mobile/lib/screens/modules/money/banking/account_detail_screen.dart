@@ -24,7 +24,9 @@ class AccountDetailScreen extends StatelessWidget {
     final account = b.open;
     final id = BankingProvider.idOf(account);
     final balances = account['balances'];
-    final bal = balances is Map ? Map<String, dynamic>.from(balances) : const {};
+    final bal = balances is Map
+        ? Map<String, dynamic>.from(balances)
+        : const {};
     final currency = '${bal['currency'] ?? account['currency'] ?? 'USD'}';
     final pending = '${account['status'] ?? ''}'.toLowerCase() == 'pending';
 
@@ -33,9 +35,14 @@ class AccountDetailScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: SColors.paper,
         surfaceTintColor: Colors.transparent,
-        title: Text(accountTitle(account),
-            style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w700, color: SColors.ink)),
+        title: Text(
+          accountTitle(account),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: SColors.ink,
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.more_horiz_rounded),
@@ -51,7 +58,11 @@ class AccountDetailScreen extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                  SSpace.lg, SSpace.sm, SSpace.lg, SSpace.lg),
+                SSpace.lg,
+                SSpace.sm,
+                SSpace.lg,
+                SSpace.lg,
+              ),
               child: AccountCard(account: account),
             ),
 
@@ -66,25 +77,30 @@ class AccountDetailScreen extends StatelessWidget {
                     color: const Color(0xFFFDF1DC),
                     borderRadius: BorderRadius.circular(SRadius.md),
                     border: Border.all(
-                        color: SColors.amber.withValues(alpha: 0.5)),
+                      color: SColors.amber.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Still being opened',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: Color(0xFF8A5B16))),
+                      const Text(
+                        'Still being opened',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          color: Color(0xFF8A5B16),
+                        ),
+                      ),
                       const SizedBox(height: SSpace.sm),
                       if (b.gaps.isEmpty)
                         const Text(
                           'Nothing more is needed from you — the bank is '
                           'still checking.',
                           style: TextStyle(
-                              color: Color(0xFF8A5B16),
-                              fontSize: 12.5,
-                              height: 1.4),
+                            color: Color(0xFF8A5B16),
+                            fontSize: 12.5,
+                            height: 1.4,
+                          ),
                         )
                       else
                         for (final gap in b.gaps)
@@ -93,15 +109,19 @@ class AccountDetailScreen extends StatelessWidget {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('• ',
-                                    style: TextStyle(
-                                        color: Color(0xFF8A5B16))),
+                                const Text(
+                                  '• ',
+                                  style: TextStyle(color: Color(0xFF8A5B16)),
+                                ),
                                 Expanded(
-                                  child: Text(gap,
-                                      style: const TextStyle(
-                                          color: Color(0xFF8A5B16),
-                                          fontSize: 12.5,
-                                          height: 1.4)),
+                                  child: Text(
+                                    gap,
+                                    style: const TextStyle(
+                                      color: Color(0xFF8A5B16),
+                                      fontSize: 12.5,
+                                      height: 1.4,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -116,18 +136,23 @@ class AccountDetailScreen extends StatelessWidget {
                             style: FilledButton.styleFrom(
                               backgroundColor: const Color(0xFF8A5B16),
                               padding: const EdgeInsets.symmetric(
-                                  vertical: SSpace.md),
+                                vertical: SSpace.md,
+                              ),
                               shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(SRadius.pill)),
+                                borderRadius: BorderRadius.circular(
+                                  SRadius.pill,
+                                ),
+                              ),
                             ),
-                            onPressed: () =>
-                                Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => const IdentityScreen(),
-                            )),
-                            child: const Text('Finish the identity check',
-                                style:
-                                    TextStyle(fontWeight: FontWeight.w700)),
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const IdentityScreen(),
+                              ),
+                            ),
+                            child: const Text(
+                              'Finish the identity check',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
                           ),
                         ),
                       ],
@@ -146,7 +171,9 @@ class AccountDetailScreen extends StatelessWidget {
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => MoveMoneyScreen(
-                              mode: MoveMode.transfer, from: account),
+                            mode: MoveMode.transfer,
+                            from: account,
+                          ),
                         ),
                       ),
                     ),
@@ -158,7 +185,8 @@ class AccountDetailScreen extends StatelessWidget {
                           : '${b.cards.length} card${b.cards.length == 1 ? '' : 's'}',
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                            builder: (_) => CardsScreen(accountId: id)),
+                          builder: (_) => CardsScreen(accountId: id),
+                        ),
                       ),
                     ),
                     const SizedBox(width: SSpace.sm),
@@ -185,40 +213,66 @@ class AccountDetailScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       _Line(
-                          k: 'Settled',
-                          v: Money.format(bal['posted'], currency: currency)),
+                        k: 'Settled',
+                        v: Money.format(bal['posted'], currency: currency),
+                      ),
                       if ((bal['held'] as num?) != null &&
                           (bal['held'] as num) > 0)
                         _Line(
-                            k: 'Held',
-                            v: '−${Money.format(bal['held'], currency: currency)}'),
+                          k: 'Held',
+                          v: '−${Money.format(bal['held'], currency: currency)}',
+                        ),
                       _Line(
-                          k: 'Available',
-                          v: Money.format(bal['available'],
-                              currency: currency),
-                          strong: true),
+                        k: 'Available',
+                        v: Money.format(bal['available'], currency: currency),
+                        strong: true,
+                      ),
                       if ((bal['overdraftLimit'] as num?) != null &&
                           (bal['overdraftLimit'] as num) > 0)
                         _Line(
-                            k: 'Overdraft',
-                            v: Money.format(bal['overdraftLimit'],
-                                currency: currency)),
+                          k: 'Overdraft',
+                          v: Money.format(
+                            bal['overdraftLimit'],
+                            currency: currency,
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ),
             ],
 
+            if (b.sectionError('cards') != null)
+              Padding(
+                padding: const EdgeInsets.all(SSpace.lg),
+                child: ModuleError(
+                  message: 'Cards: ${b.sectionError('cards')}',
+                  onRetry: b.refreshOpen,
+                ),
+              ),
             const SectionHead(title: 'Activity'),
+            if (b.sectionError('transactions') != null)
+              Padding(
+                padding: const EdgeInsets.all(SSpace.lg),
+                child: ModuleError(
+                  message: b.sectionError('transactions')!,
+                  onRetry: b.transactions.isEmpty
+                      ? b.refreshOpen
+                      : b.loadMoreTransactions,
+                ),
+              ),
             if (b.openLoading && b.transactions.isEmpty)
               const ModuleLoading()
             else if (b.openError != null)
               Padding(
                 padding: const EdgeInsets.all(SSpace.lg),
                 child: ModuleError(
-                    message: b.openError!, onRetry: b.refreshOpen),
+                  message: b.openError!,
+                  onRetry: b.refreshOpen,
+                ),
               )
-            else if (b.transactions.isEmpty)
+            else if (b.transactions.isEmpty &&
+                b.sectionError('transactions') == null)
               const Padding(
                 padding: EdgeInsets.all(SSpace.lg),
                 child: ModuleEmpty(
@@ -233,14 +287,34 @@ class AccountDetailScreen extends StatelessWidget {
               for (final t in b.transactions)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
-                      SSpace.lg, 0, SSpace.lg, SSpace.sm),
+                    SSpace.lg,
+                    0,
+                    SSpace.lg,
+                    SSpace.sm,
+                  ),
                   child: TransactionRow(
                     txn: t,
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => TransactionDetailScreen(txn: t),
-                    )),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TransactionDetailScreen(txn: t),
+                      ),
+                    ),
                   ),
                 ),
+            if (b.hasMoreTransactions)
+              Padding(
+                padding: const EdgeInsets.all(SSpace.lg),
+                child: OutlinedButton(
+                  onPressed: b.transactionsLoading
+                      ? null
+                      : b.loadMoreTransactions,
+                  child: Text(
+                    b.transactionsLoading
+                        ? 'Loading activity…'
+                        : 'Load more activity',
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -248,52 +322,76 @@ class AccountDetailScreen extends StatelessWidget {
   }
 
   void _statements(BuildContext context) {
-    final b = context.read<BankingProvider>();
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: SColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(SRadius.xl)),
       ),
       builder: (sheet) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(SSpace.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Statements',
-                  style:
-                      TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-              const SizedBox(height: SSpace.md),
-              if (b.statements.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: SSpace.lg),
-                  child: Text(
-                    'No statement has been produced for this account yet. '
-                    'They appear after the first full statement period.',
-                    style: TextStyle(
-                        color: SColors.muted, fontSize: 13, height: 1.4),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheet).height * .75,
+          child: Consumer<BankingProvider>(
+            builder: (sheet, b, _) => ListView(
+              padding: const EdgeInsets.all(SSpace.lg),
+              children: [
+                const Text(
+                  'Statements',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                ),
+                const SizedBox(height: SSpace.md),
+                if (b.sectionError('statements') != null)
+                  ModuleError(
+                    message: b.sectionError('statements')!,
+                    onRetry: b.refreshOpen,
+                  )
+                else if (b.openLoading && b.statements.isEmpty)
+                  const ModuleLoading()
+                else if (b.statements.isEmpty)
+                  const Text(
+                    'No statement has been produced for this account yet. They appear after the first full statement period.',
                   ),
-                )
-              else
-                for (final s in b.statements.take(24))
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.description_outlined,
-                        color: SColors.ink2),
+                for (final statement in b.statements)
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.description_outlined),
                     title: Text(
-                      '${s['periodStart'] ?? ''} – ${s['periodEnd'] ?? ''}',
-                      style: const TextStyle(
-                          fontSize: 13.5, fontWeight: FontWeight.w600),
+                      '${statement['periodStart'] ?? ''} – ${statement['periodEnd'] ?? ''}',
                     ),
-                    subtitle: s['closingBalance'] == null
-                        ? null
-                        : Text(
-                            'Closing ${Money.format(s['closingBalance'])}',
-                            style: const TextStyle(fontSize: 12)),
+                    subtitle: Text(
+                      'Closing ${Money.format(statement['closingBalance'])}',
+                    ),
+                    children: [
+                      for (final field in const {
+                        'openingBalance': 'Opening balance',
+                        'credits': 'Money in',
+                        'debits': 'Money out',
+                        'interestPaid': 'Interest paid',
+                        'feesCharged': 'Fees charged',
+                        'closingBalance': 'Closing balance',
+                      }.entries)
+                        if (statement[field.key] != null)
+                          FactRow(
+                            label: field.value,
+                            value: Money.format(statement[field.key]),
+                          ),
+                      TextButton.icon(
+                        onPressed: () => shareBankPdf(
+                          sheet,
+                          b.statementPdf(
+                            BankingProvider.idOf(b.open),
+                            BankingProvider.idOf(statement),
+                          ),
+                          'statement-${statement['periodEnd'] ?? BankingProvider.idOf(statement)}.pdf',
+                        ),
+                        icon: const Icon(Icons.picture_as_pdf_outlined),
+                        label: const Text('Download PDF'),
+                      ),
+                    ],
                   ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -303,7 +401,9 @@ class AccountDetailScreen extends StatelessWidget {
   void _settings(BuildContext context, Map<String, dynamic> account) {
     final b = context.read<BankingProvider>();
     final id = BankingProvider.idOf(account);
-    final nickname = TextEditingController(text: '${account['nickname'] ?? ''}');
+    final nickname = TextEditingController(
+      text: '${account['nickname'] ?? ''}',
+    );
     final overdraft = account['overdraft'];
     final optedIn = overdraft is Map && overdraft['optedIn'] == true;
 
@@ -326,9 +426,10 @@ class AccountDetailScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Account settings',
-                  style:
-                      TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+              const Text(
+                'Account settings',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+              ),
               const SizedBox(height: SSpace.lg),
               TextField(
                 controller: nickname,
@@ -342,18 +443,25 @@ class AccountDetailScreen extends StatelessWidget {
                   Navigator.of(sheet).pop();
                   final err = await b.setOverdraft(id, v);
                   if (err != null && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        backgroundColor: SColors.danger, content: Text(err)));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: SColors.danger,
+                        content: Text(err),
+                      ),
+                    );
                   }
                 },
                 activeTrackColor: CurrentSetup.brand.primary,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Allow card and ATM overdrafts',
-                    style: TextStyle(fontSize: 14)),
+                title: const Text(
+                  'Allow card and ATM overdrafts',
+                  style: TextStyle(fontSize: 14),
+                ),
                 subtitle: const Text(
-                    'Lets a payment go through when the balance will not '
-                    'cover it. Fees may apply.',
-                    style: TextStyle(fontSize: 12, height: 1.3)),
+                  'Lets a payment go through when the balance will not '
+                  'cover it. Fees may apply.',
+                  style: TextStyle(fontSize: 12, height: 1.3),
+                ),
               ),
               const SizedBox(height: SSpace.md),
               SizedBox(
@@ -361,23 +469,30 @@ class AccountDetailScreen extends StatelessWidget {
                 child: FilledButton(
                   style: FilledButton.styleFrom(
                     backgroundColor: CurrentSetup.brand.primary,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: SSpace.md + 2),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: SSpace.md + 2,
+                    ),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(SRadius.pill)),
+                      borderRadius: BorderRadius.circular(SRadius.pill),
+                    ),
                   ),
                   onPressed: () async {
                     final err = await b.rename(id, nickname.text.trim());
                     if (!sheet.mounted) return;
                     Navigator.of(sheet).pop();
                     if (err != null && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
                           backgroundColor: SColors.danger,
-                          content: Text(err)));
+                          content: Text(err),
+                        ),
+                      );
                     }
                   },
-                  child: const Text('Save',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: const Text(
+                    'Save',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ],
@@ -396,31 +511,34 @@ class _Tile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: SSpace.md),
-            decoration: BoxDecoration(
-              color: SColors.card,
-              borderRadius: BorderRadius.circular(SRadius.md),
-              border: Border.all(color: SColors.line),
-            ),
-            child: Column(
-              children: [
-                Icon(icon, size: 19, color: CurrentSetup.brand.primary),
-                const SizedBox(height: SSpace.sm),
-                Text(label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: SColors.ink2)),
-              ],
-            ),
-          ),
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: SSpace.md),
+        decoration: BoxDecoration(
+          color: SColors.card,
+          borderRadius: BorderRadius.circular(SRadius.md),
+          border: Border.all(color: SColors.line),
         ),
-      );
+        child: Column(
+          children: [
+            Icon(icon, size: 19, color: CurrentSetup.brand.primary),
+            const SizedBox(height: SSpace.sm),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: SColors.ink2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _Line extends StatelessWidget {
@@ -430,23 +548,28 @@ class _Line extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: SSpace.sm),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(k,
-                  style: TextStyle(
-                      color: strong ? SColors.ink : SColors.muted,
-                      fontSize: 13,
-                      fontWeight:
-                          strong ? FontWeight.w700 : FontWeight.w400)),
+    padding: const EdgeInsets.only(bottom: SSpace.sm),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            k,
+            style: TextStyle(
+              color: strong ? SColors.ink : SColors.muted,
+              fontSize: 13,
+              fontWeight: strong ? FontWeight.w700 : FontWeight.w400,
             ),
-            Text(v,
-                style: TextStyle(
-                    color: SColors.ink,
-                    fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
-                    fontSize: strong ? 15 : 13.5)),
-          ],
+          ),
         ),
-      );
+        Text(
+          v,
+          style: TextStyle(
+            color: SColors.ink,
+            fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+            fontSize: strong ? 15 : 13.5,
+          ),
+        ),
+      ],
+    ),
+  );
 }

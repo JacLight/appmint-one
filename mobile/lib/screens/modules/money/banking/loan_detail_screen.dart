@@ -1,3 +1,4 @@
+import 'bank_autopay.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -39,46 +40,63 @@ class LoanDetailScreen extends StatelessWidget {
       body: b.loanLoading && loan.isEmpty
           ? const ModuleLoading()
           : b.loanError != null && loan.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(SSpace.lg),
-                  child: ModuleError(
-                      message: b.loanError!, onRetry: b.refreshLoan),
-                )
-              : RefreshIndicator(
-                  color: brand.primary,
-                  onRefresh: b.refreshLoan,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(
-                        SSpace.lg, 0, SSpace.lg, SSpace.xxl),
-                    children: [
-                      _Owed(loan: loan),
-                      if (statusText.isNotEmpty) ...[
-                        const SizedBox(height: SSpace.md),
-                        Row(
-                          children: [
-                            StatusPill(look: loanStatus(status)),
-                            const SizedBox(width: SSpace.sm),
-                            // The bank's sentence, unedited.
-                            Expanded(
-                              child: Text(statusText,
-                                  style: const TextStyle(
-                                      fontSize: 12.5,
-                                      height: 1.3,
-                                      color: SColors.muted)),
+          ? Padding(
+              padding: const EdgeInsets.all(SSpace.lg),
+              child: ModuleError(message: b.loanError!, onRetry: b.refreshLoan),
+            )
+          : RefreshIndicator(
+              color: brand.primary,
+              onRefresh: b.refreshLoan,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  SSpace.lg,
+                  0,
+                  SSpace.lg,
+                  SSpace.xxl,
+                ),
+                children: [
+                  _Owed(loan: loan),
+                  BankAutopayPanel(loanId: loanId, accounts: b.accounts),
+                  if (statusText.isNotEmpty) ...[
+                    const SizedBox(height: SSpace.md),
+                    Row(
+                      children: [
+                        StatusPill(look: loanStatus(status)),
+                        const SizedBox(width: SSpace.sm),
+                        // The bank's sentence, unedited.
+                        Expanded(
+                          child: Text(
+                            statusText,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              height: 1.3,
+                              color: SColors.muted,
                             ),
-                          ],
+                          ),
                         ),
                       ],
-                      _Breakdown(loan: loan),
-                      _Payoff(payoff: b.payoff),
-                      _Terms(loan: loan),
-                      _Scra(loan: loan),
-                      _Schedule(loan: loan),
-                      _Payments(loan: loan),
-                      _LateFees(loan: loan),
-                    ],
-                  ),
-                ),
+                    ),
+                  ],
+                  _Breakdown(loan: loan),
+                  _Payoff(payoff: b.payoff),
+                  if (b.payoff.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () => shareBankPdf(
+                        context,
+                        b.payoffPdf(loanId),
+                        'payoff-$loanId.pdf',
+                      ),
+                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      label: const Text('Download payoff PDF'),
+                    ),
+                  _Terms(loan: loan),
+                  _Scra(loan: loan),
+                  _Schedule(loan: loan),
+                  _Payments(loan: loan),
+                  _LateFees(loan: loan),
+                ],
+              ),
+            ),
       bottomNavigationBar: canPay
           ? SafeArea(
               minimum: const EdgeInsets.all(SSpace.lg),
@@ -118,9 +136,14 @@ class _Owed extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (number.isNotEmpty)
-          Text(number,
-              style: const TextStyle(
-                  fontSize: 11.5, letterSpacing: 0.5, color: SColors.faint)),
+          Text(
+            number,
+            style: const TextStyle(
+              fontSize: 11.5,
+              letterSpacing: 0.5,
+              color: SColors.faint,
+            ),
+          ),
         const SizedBox(height: SSpace.xs),
         Text(
           owed == null ? 'Balance unavailable' : Money.format(owed),
@@ -132,8 +155,10 @@ class _Owed extends StatelessWidget {
             fontFamily: brand.displayFont,
           ),
         ),
-        const Text('Owed',
-            style: TextStyle(fontSize: 12, color: SColors.muted)),
+        const Text(
+          'Owed',
+          style: TextStyle(fontSize: 12, color: SColors.muted),
+        ),
         if (pastDue is num && pastDue > 0) ...[
           const SizedBox(height: SSpace.sm),
           Container(
@@ -145,17 +170,21 @@ class _Owed extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded,
-                    size: 17, color: SColors.danger),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 17,
+                  color: SColors.danger,
+                ),
                 const SizedBox(width: SSpace.sm),
                 Expanded(
                   child: Text(
                     '${Money.format(pastDue)} past due'
                     '${late ? ' · $dpd ${dpd == 1 ? 'day' : 'days'}' : ''}',
                     style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: SColors.danger),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: SColors.danger,
+                    ),
                   ),
                 ),
               ],
@@ -188,14 +217,16 @@ class _Breakdown extends StatelessWidget {
           FactRow(label: 'Fees', value: Money.format(b['fees'])),
         if ((b['lateFees'] as num? ?? 0) != 0)
           FactRow(
-              label: 'Late fees',
-              value: Money.format(b['lateFees']),
-              valueColor: SColors.danger),
+            label: 'Late fees',
+            value: Money.format(b['lateFees']),
+            valueColor: SColors.danger,
+          ),
         if ((b['unapplied'] as num? ?? 0) != 0)
           FactRow(
-              label: 'Paid, not yet applied',
-              value: Money.format(b['unapplied']),
-              valueColor: SColors.green),
+            label: 'Paid, not yet applied',
+            value: Money.format(b['unapplied']),
+            valueColor: SColors.green,
+          ),
       ],
     );
   }
@@ -220,9 +251,12 @@ class _Payoff extends StatelessWidget {
       title: 'To pay it off',
       children: [
         FactRow(
-            label: goodThrough.isEmpty ? 'Payoff today' : 'Good through $goodThrough',
-            value: Money.format(payoff['amount']),
-            strong: true),
+          label: goodThrough.isEmpty
+              ? 'Payoff today'
+              : 'Good through $goodThrough',
+          value: Money.format(payoff['amount']),
+          strong: true,
+        ),
         FactRow(label: 'Principal', value: Money.format(payoff['principal'])),
         FactRow(label: 'Interest', value: Money.format(payoff['interest'])),
         if ((payoff['fees'] as num? ?? 0) != 0)
@@ -231,8 +265,9 @@ class _Payoff extends StatelessWidget {
           FactRow(label: 'Late fees', value: Money.format(payoff['lateFees'])),
         if (perDiem != null)
           FactRow(
-              label: 'Interest per day after that',
-              value: Money.format(perDiem)),
+            label: 'Interest per day after that',
+            value: Money.format(perDiem),
+          ),
       ],
     );
   }
@@ -247,7 +282,7 @@ class _Terms extends StatelessWidget {
     final raw = loan['terms'];
     if (raw is! Map) return const SizedBox.shrink();
     final t = Map<String, dynamic>.from(raw);
-    final autopay = loan['autopay'];
+
     final frequency = '${t['frequency'] ?? ''}'.replaceAll('_', ' ').trim();
 
     return _Card(
@@ -262,11 +297,11 @@ class _Terms extends StatelessWidget {
           FactRow(label: 'Term', value: '${t['termMonths']} months'),
         if (t['paymentAmount'] != null)
           FactRow(
-              label: frequency.isEmpty ? 'Payment' : 'Payment ($frequency)',
-              value: Money.format(t['paymentAmount'])),
+            label: frequency.isEmpty ? 'Payment' : 'Payment ($frequency)',
+            value: Money.format(t['paymentAmount']),
+          ),
         if ('${t['firstPaymentDate'] ?? ''}'.isNotEmpty)
-          FactRow(
-              label: 'First payment', value: '${t['firstPaymentDate']}'),
+          FactRow(label: 'First payment', value: '${t['firstPaymentDate']}'),
         if ('${t['maturityDate'] ?? ''}'.isNotEmpty)
           FactRow(label: 'Last payment', value: '${t['maturityDate']}'),
         if (t['graceDays'] != null)
@@ -275,12 +310,9 @@ class _Terms extends StatelessWidget {
           FactRow(label: 'Late fee', value: Money.format(t['lateFee'])),
         if ((t['originationFee'] as num? ?? 0) != 0)
           FactRow(
-              label: 'Origination fee',
-              value: Money.format(t['originationFee'])),
-        if (autopay is Map)
-          FactRow(
-              label: 'Automatic payments',
-              value: autopay['enabled'] == true ? 'On' : 'Off'),
+            label: 'Origination fee',
+            value: Money.format(t['originationFee']),
+          ),
       ],
     );
   }
@@ -307,9 +339,10 @@ class _Scra extends StatelessWidget {
           FactRow(label: 'Capped rate', value: Rate.format(s['rateBps'])),
         if ((s['creditedInterest'] as num? ?? 0) != 0)
           FactRow(
-              label: 'Interest credited back',
-              value: Money.format(s['creditedInterest']),
-              valueColor: SColors.green),
+            label: 'Interest credited back',
+            value: Money.format(s['creditedInterest']),
+            valueColor: SColors.green,
+          ),
         if ('${s['serviceStart'] ?? ''}'.isNotEmpty)
           FactRow(label: 'Service from', value: '${s['serviceStart']}'),
         if ('${s['serviceEnd'] ?? ''}'.isNotEmpty)
@@ -362,7 +395,9 @@ class _ScheduleRow extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: SSpace.xs),
       padding: const EdgeInsets.symmetric(
-          horizontal: SSpace.sm, vertical: SSpace.sm),
+        horizontal: SSpace.sm,
+        vertical: SSpace.sm,
+      ),
       decoration: BoxDecoration(
         color: isNext ? SColors.paper2 : Colors.transparent,
         borderRadius: BorderRadius.circular(SRadius.sm),
@@ -371,21 +406,27 @@ class _ScheduleRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 26,
-            child: Text('${row['number'] ?? ''}',
-                style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: SColors.faint)),
+            child: Text(
+              '${row['number'] ?? ''}',
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: SColors.faint,
+              ),
+            ),
           ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${row['dueDate'] ?? ''}',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isNext ? FontWeight.w800 : FontWeight.w600,
-                        color: paid ? SColors.muted : SColors.ink)),
+                Text(
+                  '${row['dueDate'] ?? ''}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isNext ? FontWeight.w800 : FontWeight.w600,
+                    color: paid ? SColors.muted : SColors.ink,
+                  ),
+                ),
                 const SizedBox(height: 1),
                 Text(
                   [
@@ -403,17 +444,21 @@ class _ScheduleRow extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(Money.format(row['payment']),
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: paid ? SColors.muted : SColors.ink)),
+              Text(
+                Money.format(row['payment']),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: paid ? SColors.muted : SColors.ink,
+                ),
+              ),
               Text(
                 paid ? 'Paid' : (isNext ? 'Next' : 'Due'),
                 style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: paid ? SColors.green : SColors.faint),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: paid ? SColors.green : SColors.faint,
+                ),
               ),
             ],
           ),
@@ -442,9 +487,7 @@ class _Payments extends StatelessWidget {
       title: 'Payments',
       subtitle: '${rows.length} made',
       initiallyExpanded: false,
-      children: [
-        for (final p in rows) _PaymentRow(payment: p),
-      ],
+      children: [for (final p in rows) _PaymentRow(payment: p)],
     );
   }
 }
@@ -471,9 +514,10 @@ class _PaymentRow extends StatelessWidget {
                 child: Text(
                   '${payment['effectiveDate'] ?? payment['postedAt'] ?? ''}',
                   style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: SColors.ink),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: SColors.ink,
+                  ),
                 ),
               ),
               Text(
@@ -504,8 +548,10 @@ class _PaymentRow extends StatelessWidget {
             ),
           ],
           if (status.isNotEmpty && status != 'posted')
-            Text(status,
-                style: const TextStyle(fontSize: 10.5, color: SColors.amber)),
+            Text(
+              status,
+              style: const TextStyle(fontSize: 10.5, color: SColors.amber),
+            ),
         ],
       ),
     );
@@ -535,9 +581,7 @@ class _LateFees extends StatelessWidget {
               '${f['effectiveDate'] ?? ''}',
               if (f['installment'] != null) 'payment ${f['installment']}',
             ].where((s) => s.isNotEmpty).join(' · '),
-            value: f['waived'] == true
-                ? 'Waived'
-                : Money.format(f['amount']),
+            value: f['waived'] == true ? 'Waived' : Money.format(f['amount']),
             valueColor: f['waived'] == true ? SColors.green : SColors.danger,
           ),
       ],
@@ -571,8 +615,12 @@ class _Card extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(top: SSpace.lg),
-      padding: EdgeInsets.fromLTRB(SSpace.lg, initiallyExpanded ? SSpace.lg : 0,
-          SSpace.lg, initiallyExpanded ? SSpace.lg : 0),
+      padding: EdgeInsets.fromLTRB(
+        SSpace.lg,
+        initiallyExpanded ? SSpace.lg : 0,
+        SSpace.lg,
+        initiallyExpanded ? SSpace.lg : 0,
+      ),
       decoration: BoxDecoration(
         color: SColors.card,
         borderRadius: BorderRadius.circular(SRadius.xl),
@@ -582,33 +630,44 @@ class _Card extends StatelessWidget {
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: SColors.ink)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: SColors.ink,
+                  ),
+                ),
                 const SizedBox(height: SSpace.sm),
                 body,
               ],
             )
           : Theme(
-              data: Theme.of(context)
-                  .copyWith(dividerColor: Colors.transparent),
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: const EdgeInsets.only(bottom: SSpace.lg),
                 shape: const Border(),
                 collapsedShape: const Border(),
-                title: Text(title,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: SColors.ink)),
+                title: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: SColors.ink,
+                  ),
+                ),
                 subtitle: subtitle == null
                     ? null
-                    : Text(subtitle!,
+                    : Text(
+                        subtitle!,
                         style: const TextStyle(
-                            fontSize: 12, color: SColors.muted)),
+                          fontSize: 12,
+                          color: SColors.muted,
+                        ),
+                      ),
                 children: [body],
               ),
             ),
@@ -633,6 +692,7 @@ class _PaySheet extends StatefulWidget {
 }
 
 class _PaySheetState extends State<_PaySheet> {
+  bool _pending = false;
   final _amount = TextEditingController();
   String? _from;
   String? _error;
@@ -658,11 +718,11 @@ class _PaySheetState extends State<_PaySheet> {
   }
 
   List<Map<String, dynamic>> _payFrom(BankingProvider b) => [
-        for (final a in b.accounts)
-          if ('${a['status'] ?? ''}'.toLowerCase() == 'open' &&
-              '${a['kind'] ?? ''}'.toLowerCase() != 'loan')
-            a,
-      ];
+    for (final a in b.accounts)
+      if ('${a['status'] ?? ''}'.toLowerCase() == 'open' &&
+          '${a['kind'] ?? ''}'.toLowerCase() != 'loan')
+        a,
+  ];
 
   Future<void> _submit() async {
     final b = context.read<BankingProvider>();
@@ -678,11 +738,20 @@ class _PaySheetState extends State<_PaySheet> {
     }
 
     setState(() => _error = null);
+    String? receiptStatus;
     final failure = await b.payLoan(
-        loanId: widget.loanId, amountCents: cents, fromAccount: from);
+      loanId: widget.loanId,
+      amountCents: cents,
+      fromAccount: from,
+      onReceipt: (status) => receiptStatus = status,
+    );
     if (!mounted) return;
     if (failure != null) {
       setState(() => _error = failure);
+      return;
+    }
+    if (receiptStatus != 'posted') {
+      setState(() => _pending = true);
       return;
     }
     Navigator.of(context).pop();
@@ -706,12 +775,17 @@ class _PaySheetState extends State<_PaySheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Pay this loan',
-                style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Pay this loan',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: SSpace.lg),
             TextField(
               controller: _amount,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              enabled: !_pending,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(
                 labelText: 'Amount',
                 prefixText: '\$ ',
@@ -722,23 +796,33 @@ class _PaySheetState extends State<_PaySheet> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton(
-                  onPressed: () => setState(() => _amount.text =
-                      ((payoffAmount as num) / 100).toStringAsFixed(2)),
+                  onPressed: _pending
+                      ? null
+                      : () => setState(
+                          () => _amount.text = ((payoffAmount as num) / 100)
+                              .toStringAsFixed(2),
+                        ),
                   style: TextButton.styleFrom(padding: EdgeInsets.zero),
                   child: Text(
-                      'Pay it off in full — ${Money.format(payoffAmount)}',
-                      style: const TextStyle(
-                          fontSize: 12.5, fontWeight: FontWeight.w700)),
+                    'Pay it off in full — ${Money.format(payoffAmount)}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ),
             ],
             const SizedBox(height: SSpace.lg),
-            const Text('From',
-                style: TextStyle(
-                    fontSize: 12,
-                    letterSpacing: 1,
-                    fontWeight: FontWeight.w700,
-                    color: SColors.faint)),
+            const Text(
+              'From',
+              style: TextStyle(
+                fontSize: 12,
+                letterSpacing: 1,
+                fontWeight: FontWeight.w700,
+                color: SColors.faint,
+              ),
+            ),
             const SizedBox(height: SSpace.sm),
             if (accounts.isEmpty)
               const Text(
@@ -756,9 +840,17 @@ class _PaySheetState extends State<_PaySheet> {
                       '${Money.format((a['balances'] as Map)['available'])} available',
                   ].join(' · '),
                   selected: _from == BankingProvider.idOf(a),
-                  onTap: () =>
-                      setState(() => _from = BankingProvider.idOf(a)),
+                  onTap: () {
+                    if (!_pending)
+                      setState(() => _from = BankingProvider.idOf(a));
+                  },
                 ),
+            if (_pending) ...[
+              const SizedBox(height: SSpace.md),
+              const Text(
+                'Request received — awaiting bank processing. Your loan payment is not confirmed yet.',
+              ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: SSpace.md),
               ModuleError(message: _error!),
@@ -768,7 +860,13 @@ class _PaySheetState extends State<_PaySheet> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: b.busy || accounts.isEmpty ? null : _submit,
-                child: Text(b.busy ? 'Paying…' : 'Pay'),
+                child: Text(
+                  b.busy
+                      ? 'Paying…'
+                      : _pending
+                      ? 'Check payment'
+                      : 'Pay',
+                ),
               ),
             ),
           ],

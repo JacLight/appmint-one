@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:printing/printing.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../config/setup.dart';
@@ -26,10 +28,10 @@ String accountTail(Map<String, dynamic> account) {
     switch (status.toLowerCase()) {
       'open' => (label: 'Open', fg: SColors.green2, bg: SColors.greenSoft),
       'pending' => (
-          label: 'Being opened',
-          fg: Color(0xFF8A5B16),
-          bg: Color(0xFFFDF1DC)
-        ),
+        label: 'Being opened',
+        fg: Color(0xFF8A5B16),
+        bg: Color(0xFFFDF1DC),
+      ),
       'frozen' => (label: 'Frozen', fg: SColors.danger, bg: Color(0xFFFBE9E7)),
       'dormant' => (label: 'Dormant', fg: SColors.muted, bg: SColors.paper2),
       'closed' => (label: 'Closed', fg: SColors.muted, bg: SColors.paper2),
@@ -94,7 +96,9 @@ class AccountCard extends StatelessWidget {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: SSpace.sm + 2, vertical: 3),
+                    horizontal: SSpace.sm + 2,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: pending ? look.bg : Colors.white24,
                     borderRadius: BorderRadius.circular(SRadius.pill),
@@ -141,9 +145,11 @@ class AccountCard extends StatelessWidget {
               const SizedBox(height: SSpace.sm),
               Row(
                 children: [
-                  Icon(Icons.lock_clock_rounded,
-                      size: 13,
-                      color: pending ? SColors.muted : Colors.white70),
+                  Icon(
+                    Icons.lock_clock_rounded,
+                    size: 13,
+                    color: pending ? SColors.muted : Colors.white70,
+                  ),
                   const SizedBox(width: SSpace.xs + 1),
                   Text(
                     '${Money.format(held, currency: currency)} held',
@@ -182,7 +188,8 @@ class TransactionRow extends StatelessWidget {
     // ordinary spending, which is what most of a statement is.
     final incoming = direction == 'in';
     final settled = status == 'posted';
-    final dead = status == 'returned' ||
+    final dead =
+        status == 'returned' ||
         status == 'failed' ||
         status == 'cancelled' ||
         status == 'reversed';
@@ -191,7 +198,9 @@ class TransactionRow extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(
-            horizontal: SSpace.md, vertical: SSpace.md),
+          horizontal: SSpace.md,
+          vertical: SSpace.md,
+        ),
         decoration: BoxDecoration(
           color: SColors.card,
           borderRadius: BorderRadius.circular(SRadius.md),
@@ -207,22 +216,22 @@ class TransactionRow extends StatelessWidget {
                 color: dead
                     ? SColors.paper2
                     : incoming
-                        ? SColors.greenSoft
-                        : SColors.paper2,
+                    ? SColors.greenSoft
+                    : SColors.paper2,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 dead
                     ? Icons.block_rounded
                     : incoming
-                        ? Icons.south_west_rounded
-                        : Icons.north_east_rounded,
+                    ? Icons.south_west_rounded
+                    : Icons.north_east_rounded,
                 size: 16,
                 color: dead
                     ? SColors.faint
                     : incoming
-                        ? SColors.green
-                        : SColors.ink2,
+                    ? SColors.green
+                    : SColors.ink2,
               ),
             ),
             const SizedBox(width: SSpace.md),
@@ -238,8 +247,7 @@ class TransactionRow extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                       color: dead ? SColors.muted : SColors.ink,
-                      decoration:
-                          dead ? TextDecoration.lineThrough : null,
+                      decoration: dead ? TextDecoration.lineThrough : null,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -271,8 +279,8 @@ class TransactionRow extends StatelessWidget {
                 color: dead
                     ? SColors.faint
                     : incoming
-                        ? SColors.green
-                        : SColors.ink,
+                    ? SColors.green
+                    : SColors.ink,
               ),
             ),
           ],
@@ -282,14 +290,14 @@ class TransactionRow extends StatelessWidget {
   }
 
   static String _statusWord(String status) => switch (status) {
-        'pending' => 'Pending',
-        'returned' => 'Returned',
-        'failed' => 'Failed',
-        'cancelled' => 'Cancelled',
-        'reversed' => 'Reversed',
-        'in_review' => 'Pending',
-        _ => status,
-      };
+    'pending' => 'Pending',
+    'returned' => 'Returned',
+    'failed' => 'Failed',
+    'cancelled' => 'Cancelled',
+    'reversed' => 'Reversed',
+    'in_review' => 'Pending',
+    _ => status,
+  };
 }
 
 /// A pick-one row.
@@ -320,11 +328,14 @@ class PickRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: SSpace.sm),
         padding: const EdgeInsets.all(SSpace.md),
         decoration: BoxDecoration(
-          color: selected ? brand.primary.withValues(alpha: 0.07) : SColors.card,
+          color: selected
+              ? brand.primary.withValues(alpha: 0.07)
+              : SColors.card,
           borderRadius: BorderRadius.circular(SRadius.md),
           border: Border.all(
-              color: selected ? brand.primary : SColors.line,
-              width: selected ? 1.4 : 1),
+            color: selected ? brand.primary : SColors.line,
+            width: selected ? 1.4 : 1,
+          ),
         ),
         child: Row(
           children: [
@@ -340,16 +351,23 @@ class PickRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: SColors.ink)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: SColors.ink,
+                    ),
+                  ),
                   if (subtitle != null && subtitle!.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    Text(subtitle!,
-                        style: const TextStyle(
-                            color: SColors.muted, fontSize: 12)),
+                    Text(
+                      subtitle!,
+                      style: const TextStyle(
+                        color: SColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -370,63 +388,53 @@ class PickRow extends StatelessWidget {
 // short word is a label; the sentence is the bank speaking.
 
 /// A loan's standing. Keys from `LOAN_TEXT` on the server.
-({String label, Color fg, Color bg}) loanStatus(String status) =>
-    switch (status.toLowerCase()) {
-      'active' => (label: 'Current', fg: SColors.green2, bg: SColors.greenSoft),
-      'arrears' => (
-          label: 'Past due',
-          fg: SColors.danger,
-          bg: Color(0xFFFBE9E7)
-        ),
-      'booked' => (
-          label: 'On its way',
-          fg: Color(0xFF8A5B16),
-          bg: Color(0xFFFDF1DC)
-        ),
-      'paid_off' => (label: 'Paid off', fg: SColors.muted, bg: SColors.paper2),
-      'charged_off' => (
-          label: 'Still owed',
-          fg: SColors.danger,
-          bg: Color(0xFFFBE9E7)
-        ),
-      'closed' => (label: 'Closed', fg: SColors.muted, bg: SColors.paper2),
-      _ => (label: status, fg: SColors.ink2, bg: SColors.paper2),
-    };
+({String label, Color fg, Color bg}) loanStatus(String status) => switch (status
+    .toLowerCase()) {
+  'active' => (label: 'Current', fg: SColors.green2, bg: SColors.greenSoft),
+  'arrears' => (label: 'Past due', fg: SColors.danger, bg: Color(0xFFFBE9E7)),
+  'booked' => (
+    label: 'On its way',
+    fg: Color(0xFF8A5B16),
+    bg: Color(0xFFFDF1DC),
+  ),
+  'paid_off' => (label: 'Paid off', fg: SColors.muted, bg: SColors.paper2),
+  'charged_off' => (
+    label: 'Still owed',
+    fg: SColors.danger,
+    bg: Color(0xFFFBE9E7),
+  ),
+  'closed' => (label: 'Closed', fg: SColors.muted, bg: SColors.paper2),
+  _ => (label: status, fg: SColors.ink2, bg: SColors.paper2),
+};
 
 /// An application's stage. Keys from `STAGE_TEXT` on the server.
-({String label, Color fg, Color bg}) applicationStatus(String status) =>
-    switch (status.toLowerCase()) {
-      'draft' => (label: 'Not sent', fg: SColors.muted, bg: SColors.paper2),
-      'complete' => (
-          label: 'Received',
-          fg: Color(0xFF8A5B16),
-          bg: Color(0xFFFDF1DC)
-        ),
-      'verification' || 'underwriting' => (
-          label: 'In review',
-          fg: Color(0xFF8A5B16),
-          bg: Color(0xFFFDF1DC)
-        ),
-      'approved' || 'closing' => (
-          label: 'Approved',
-          fg: SColors.green2,
-          bg: SColors.greenSoft
-        ),
-      'countered' => (
-          label: 'Needs you',
-          fg: SColors.clay2,
-          bg: SColors.claySoft
-        ),
-      'booked' => (label: 'Set up', fg: SColors.green2, bg: SColors.greenSoft),
-      'declined' => (
-          label: 'Not approved',
-          fg: SColors.danger,
-          bg: Color(0xFFFBE9E7)
-        ),
-      'withdrawn' => (label: 'Withdrawn', fg: SColors.muted, bg: SColors.paper2),
-      'incomplete' => (label: 'Closed', fg: SColors.muted, bg: SColors.paper2),
-      _ => (label: status, fg: SColors.ink2, bg: SColors.paper2),
-    };
+({String label, Color fg, Color bg}) applicationStatus(
+  String status,
+) => switch (status.toLowerCase()) {
+  'draft' => (label: 'Not sent', fg: SColors.muted, bg: SColors.paper2),
+  'complete' => (
+    label: 'Received',
+    fg: Color(0xFF8A5B16),
+    bg: Color(0xFFFDF1DC),
+  ),
+  'verification' || 'underwriting' => (
+    label: 'In review',
+    fg: Color(0xFF8A5B16),
+    bg: Color(0xFFFDF1DC),
+  ),
+  'approved' ||
+  'closing' => (label: 'Approved', fg: SColors.green2, bg: SColors.greenSoft),
+  'countered' => (label: 'Needs you', fg: SColors.clay2, bg: SColors.claySoft),
+  'booked' => (label: 'Set up', fg: SColors.green2, bg: SColors.greenSoft),
+  'declined' => (
+    label: 'Not approved',
+    fg: SColors.danger,
+    bg: Color(0xFFFBE9E7),
+  ),
+  'withdrawn' => (label: 'Withdrawn', fg: SColors.muted, bg: SColors.paper2),
+  'incomplete' => (label: 'Closed', fg: SColors.muted, bg: SColors.paper2),
+  _ => (label: status, fg: SColors.ink2, bg: SColors.paper2),
+};
 
 /// A short status word, in its own colours.
 class StatusPill extends StatelessWidget {
@@ -435,18 +443,20 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: SSpace.sm + 2, vertical: 3),
-        decoration: BoxDecoration(
-          color: look.bg,
-          borderRadius: BorderRadius.circular(SRadius.pill),
-        ),
-        child: Text(
-          look.label,
-          style: TextStyle(
-              fontSize: 10.5, fontWeight: FontWeight.w700, color: look.fg),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: SSpace.sm + 2, vertical: 3),
+    decoration: BoxDecoration(
+      color: look.bg,
+      borderRadius: BorderRadius.circular(SRadius.pill),
+    ),
+    child: Text(
+      look.label,
+      style: TextStyle(
+        fontSize: 10.5,
+        fontWeight: FontWeight.w700,
+        color: look.fg,
+      ),
+    ),
+  );
 }
 
 /// A labelled figure. Used wherever a loan's numbers are laid out, so a rate
@@ -465,29 +475,31 @@ class FactRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Text(label,
-                  style: const TextStyle(fontSize: 13, color: SColors.muted)),
-            ),
-            const SizedBox(width: SSpace.md),
-            Flexible(
-              child: Text(
-                value,
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                  fontSize: strong ? 15 : 13.5,
-                  fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
-                  color: valueColor ?? SColors.ink,
-                ),
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: SColors.muted),
+          ),
         ),
-      );
+        const SizedBox(width: SSpace.md),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: strong ? 15 : 13.5,
+              fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+              color: valueColor ?? SColors.ink,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// One of my loans, in a list. What is owed leads, because that is the
@@ -519,8 +531,9 @@ class LoanCard extends StatelessWidget {
           color: SColors.card,
           borderRadius: BorderRadius.circular(SRadius.xl),
           border: Border.all(
-              color: late ? SColors.danger : SColors.line,
-              width: late ? 1.3 : 1),
+            color: late ? SColors.danger : SColors.line,
+            width: late ? 1.3 : 1,
+          ),
           boxShadow: SShadow.soft,
         ),
         child: Column(
@@ -534,9 +547,10 @@ class LoanCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: SColors.ink),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: SColors.ink,
+                    ),
                   ),
                 ),
                 StatusPill(look: look),
@@ -544,9 +558,14 @@ class LoanCard extends StatelessWidget {
             ),
             if (number.isNotEmpty) ...[
               const SizedBox(height: 2),
-              Text(number,
-                  style: const TextStyle(
-                      fontSize: 11.5, letterSpacing: 0.5, color: SColors.muted)),
+              Text(
+                number,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  letterSpacing: 0.5,
+                  color: SColors.muted,
+                ),
+              ),
             ],
             const SizedBox(height: SSpace.md),
             Text(
@@ -557,8 +576,10 @@ class LoanCard extends StatelessWidget {
                 color: late ? SColors.danger : SColors.ink,
               ),
             ),
-            const Text('Owed',
-                style: TextStyle(fontSize: 11.5, color: SColors.muted)),
+            const Text(
+              'Owed',
+              style: TextStyle(fontSize: 11.5, color: SColors.muted),
+            ),
             const SizedBox(height: SSpace.md),
             Wrap(
               spacing: SSpace.lg,
@@ -576,15 +597,19 @@ class LoanCard extends StatelessWidget {
               const SizedBox(height: SSpace.md),
               Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded,
-                      size: 14, color: SColors.danger),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 14,
+                    color: SColors.danger,
+                  ),
                   const SizedBox(width: SSpace.xs + 1),
                   Text(
                     '$dpd ${dpd == 1 ? 'day' : 'days'} past due',
                     style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: SColors.danger),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: SColors.danger,
+                    ),
                   ),
                 ],
               ),
@@ -602,22 +627,28 @@ class _Fact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label.toUpperCase(),
-              style: const TextStyle(
-                  fontSize: 9.5,
-                  letterSpacing: 1,
-                  fontWeight: FontWeight.w700,
-                  color: SColors.faint)),
-          const SizedBox(height: 1),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: SColors.ink2)),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 9.5,
+          letterSpacing: 1,
+          fontWeight: FontWeight.w700,
+          color: SColors.faint,
+        ),
+      ),
+      const SizedBox(height: 1),
+      Text(
+        value,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: SColors.ink2,
+        ),
+      ),
+    ],
+  );
 }
 
 /// One application, in a list. An offer waiting on an answer is called out:
@@ -647,8 +678,9 @@ class ApplicationRow extends StatelessWidget {
           color: SColors.card,
           borderRadius: BorderRadius.circular(SRadius.md),
           border: Border.all(
-              color: needsAnswer ? SColors.clay : SColors.line,
-              width: needsAnswer ? 1.3 : 1),
+            color: needsAnswer ? SColors.clay : SColors.line,
+            width: needsAnswer ? 1.3 : 1,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -661,9 +693,10 @@ class ApplicationRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: SColors.ink),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: SColors.ink,
+                    ),
                   ),
                 ),
                 StatusPill(look: look),
@@ -676,21 +709,49 @@ class ApplicationRow extends StatelessWidget {
                 if (term != null) '$term months',
               ].join(' · '),
               style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: SColors.ink2),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: SColors.ink2,
+              ),
             ),
             // The bank's own sentence, as sent.
             if (statusText.isNotEmpty) ...[
               const SizedBox(height: 3),
-              Text(statusText,
-                  style: TextStyle(
-                      fontSize: 12,
-                      height: 1.3,
-                      color: needsAnswer ? SColors.clay2 : SColors.muted)),
+              Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.3,
+                  color: needsAnswer ? SColors.clay2 : SColors.muted,
+                ),
+              ),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Share an authenticated server-rendered document through the app's existing
+/// native printing integration; never open a credential-bearing URL externally.
+Future<void> shareBankPdf(
+  BuildContext context,
+  Future<Uint8List> document,
+  String filename,
+) async {
+  try {
+    final bytes = await document;
+    if (!context.mounted) return;
+    if (bytes.length < 5 || String.fromCharCodes(bytes.take(5)) != '%PDF-')
+      throw StateError('The server did not return a PDF. Try again.');
+    await Printing.sharePdf(bytes: bytes, filename: filename);
+  } catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error.toString().replaceFirst('Exception: ', '')),
+        backgroundColor: SColors.danger,
       ),
     );
   }

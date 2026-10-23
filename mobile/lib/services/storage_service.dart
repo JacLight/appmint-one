@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/environment.dart';
@@ -11,6 +12,66 @@ class StorageService {
 
   final _secure = const FlutterSecureStorage();
   SharedPreferences? _prefs;
+
+  // Payment payloads and keys belong in the same secure store as credentials,
+  // never SharedPreferences. Serialize changes so concurrent intents cannot
+  // overwrite each other's recovery records.
+  static const _bankingIntentKey = 'appmint.banking.unresolved-intents.v1';
+  Future<void> _bankingIntentQueue = Future.value();
+
+  Future<T> _withBankingIntents<T>(
+    Future<T> Function(Map<String, String>) run,
+  ) {
+    final result = Completer<T>();
+    _bankingIntentQueue = _bankingIntentQueue.then((_) async {
+      try {
+        final raw = await _secure.read(key: _bankingIntentKey);
+        final decoded = raw == null ? <String, dynamic>{} : jsonDecode(raw);
+        if (decoded is! Map || decoded.values.any((value) => value is! String))
+          throw StateError('Payment recovery storage is invalid.');
+        final intents = Map<String, String>.from(decoded);
+        result.complete(await run(intents));
+      } catch (error, stack) {
+        result.completeError(error, stack);
+      }
+    });
+    return result.future;
+  }
+
+  Future<String> getOrCreateBankingIntent(
+    String scopedIntent,
+    String Function() makeKey,
+  ) => _withBankingIntents((intents) async {
+    final existing = intents[scopedIntent];
+    if (existing != null && existing.isNotEmpty) return existing;
+    final key = makeKey();
+    intents[scopedIntent] = key;
+    await _secure.write(key: _bankingIntentKey, value: jsonEncode(intents));
+    return key;
+  });
+
+  Future<void> removeBankingIntent(String scopedIntent) => _withBankingIntents((
+    intents,
+  ) async {
+    intents.remove(scopedIntent);
+    if (intents.isEmpty) {
+      await _secure.delete(key: _bankingIntentKey);
+    } else {
+      await _secure.write(key: _bankingIntentKey, value: jsonEncode(intents));
+    }
+  });
+
+  Future<String?> bankingProof(String scopedKey) =>
+      _withBankingIntents((intents) async => intents['proof:$scopedKey']);
+
+  Future<void> saveBankingProof(String scopedKey, String proof) =>
+      _withBankingIntents((intents) async {
+        intents['proof:$scopedKey'] = proof;
+        await _secure.write(key: _bankingIntentKey, value: jsonEncode(intents));
+      });
+
+  Future<void> removeBankingProof(String scopedKey) =>
+      removeBankingIntent('proof:$scopedKey');
 
   Future<void> initialize() async =>
       _prefs = await SharedPreferences.getInstance();

@@ -1,3 +1,5 @@
+import 'screens/modules/money/banking/bank_verification.dart';
+import 'services/banking_api.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -29,7 +31,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   EnvironmentConfig.setEnvironment(
-      kReleaseMode ? Environment.production : Environment.development);
+    kReleaseMode ? Environment.production : Environment.development,
+  );
 
   await storageService.initialize();
   // Warm the app token in the background — do NOT block first paint on a
@@ -61,7 +64,14 @@ class AppmintOneApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CheckoutProvider()),
         ChangeNotifierProvider(create: (_) => LogisticsProvider()),
         ChangeNotifierProvider(create: (_) => DriverProvider()),
-        ChangeNotifierProvider(create: (_) => BankingProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, BankingProvider>(
+          create: (_) => BankingProvider(),
+          update: (_, auth, bank) => (bank ?? BankingProvider())
+            ..bindMoneyScope(
+              EnvironmentConfig.orgId,
+              auth.isAuthenticated ? auth.user?.id : null,
+            ),
+        ),
         ChangeNotifierProvider(create: (_) => SchedulingProvider()),
         ChangeNotifierProvider(create: (_) => StoreProvider()),
         ChangeNotifierProvider(create: (_) => PropertyProvider()),
@@ -69,34 +79,36 @@ class AppmintOneApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LearningProvider()),
       ],
       child: Consumer<SetupProvider>(
-        builder: (context, setups, _) => MaterialApp(
-          key: ValueKey('setup-' + setups.active.id),
-        // The OS task-switcher title is the setup's brand, not the
-        // scaffold's name.
-        title: CurrentSetup.brand.name.isEmpty
-            ? 'Appmint One'
-            : CurrentSetup.brand.name,
-        debugShowCheckedModeBanner: false,
-        // Each setup wears its own brand, buttons included.
-        theme: StowboTheme.forBrand(setups.active.brand),
-        // On a wide screen (web/desktop) keep the mobile-first layout centered
-        // in a phone-width column instead of stretching edge to edge.
-        builder: (context, child) {
-          if (child == null) return const SizedBox.shrink();
-          final w = MediaQuery.of(context).size.width;
-          if (w <= 620) return child;
-          return ColoredBox(
-            color: SColors.paper2,
-            child: Center(
-              child: ClipRect(
-                child: SizedBox(width: 480, child: child),
-              ),
-            ),
+        builder: (context, setups, _) {
+          bankingApi.confirmVerification = confirmBankingReview;
+          return MaterialApp(
+            navigatorKey: bankingNavigatorKey,
+            key: ValueKey('setup-' + setups.active.id),
+            // The OS task-switcher title is the setup's brand, not the
+            // scaffold's name.
+            title: CurrentSetup.brand.name.isEmpty
+                ? 'Appmint One'
+                : CurrentSetup.brand.name,
+            debugShowCheckedModeBanner: false,
+            // Each setup wears its own brand, buttons included.
+            theme: StowboTheme.forBrand(setups.active.brand),
+            // On a wide screen (web/desktop) keep the mobile-first layout centered
+            // in a phone-width column instead of stretching edge to edge.
+            builder: (context, child) {
+              if (child == null) return const SizedBox.shrink();
+              final w = MediaQuery.of(context).size.width;
+              if (w <= 620) return child;
+              return ColoredBox(
+                color: SColors.paper2,
+                child: Center(
+                  child: ClipRect(child: SizedBox(width: 480, child: child)),
+                ),
+              );
+            },
+            home: const UpdateGate(child: RootScreen()),
           );
         },
-        home: const UpdateGate(child: RootScreen()),
       ),
-        ),
     );
   }
 }

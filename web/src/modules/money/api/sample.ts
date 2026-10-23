@@ -405,13 +405,14 @@ export class SampleBankingApi implements BankingApi {
   }
   async setCardLimits(id: string, input: CardLimitsInput, proof: StepUpProof): Promise<Card> {
     const c = await this.getCard(id);
-    const check = (v: number | undefined, max: number, label: string, field: string) => {
+    const check = (v: number | undefined, max: number | undefined, label: string, field: string) => {
       if (v === undefined) return;
+      if (max === undefined) throw new BankError("UNAVAILABLE", "This card’s limit settings aren’t available.");
       if (!Number.isFinite(v) || v < 0) throw new BankError("VALIDATION", `Enter a ${label} limit.`, field);
       if (v > max) throw new BankError("LIMIT_EXCEEDED", `The highest ${label} limit for this card is $${(max / 100).toLocaleString("en-US")}.`, field);
     };
-    check(input.purchasesDaily, c.limits.purchasesDaily.max.amount, "daily spending", "purchasesDaily");
-    check(input.atmDaily, c.limits.atmDaily.max.amount, "daily ATM", "atmDaily");
+    check(input.purchasesDaily, c.limits.purchasesDaily.max?.amount, "daily spending", "purchasesDaily");
+    check(input.atmDaily, c.limits.atmDaily.max?.amount, "daily ATM", "atmDaily");
     this.checkProof(proof, "card_limits");
     const limits = {
       purchasesDaily: input.purchasesDaily !== undefined ? { ...c.limits.purchasesDaily, limit: usd(Math.round(input.purchasesDaily)) } : c.limits.purchasesDaily,

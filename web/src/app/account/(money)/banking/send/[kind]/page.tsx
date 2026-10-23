@@ -1,35 +1,86 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSetup } from "@/lib/setup";
-import { bankingMode, load } from "@/modules/money/api/adapter";
+import {
+  bankingMode,
+  load,
+  usesEngineBanking,
+} from "@/modules/money/api/adapter";
 import type { TransferKind } from "@/modules/money/api/types";
 import { BankHead, ErrorPanel } from "@/modules/money/components/bits";
 import { SendFlow } from "@/modules/money/components/send-flow";
+import { BankMembersPanel } from "@/modules/money/components/bank-domain-panels";
 import { SendAside } from "@/modules/money/components/send-aside";
 
 const KINDS: TransferKind[] = ["external", "internal", "own"];
 
-export async function generateMetadata({ params }: { params: Promise<{ kind: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ kind: string }>;
+}): Promise<Metadata> {
   const k = (await params).kind;
   return { title: k === "own" ? "Move money" : "Send money" };
 }
 
-export default async function SendKindPage({ params, searchParams }: { params: Promise<{ kind: string }>; searchParams: Promise<{ to?: string; from?: string; amount?: string }> }) {
-  const [{ kind }, sp, setup] = await Promise.all([params, searchParams, getSetup()]);
+export default async function SendKindPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ kind: string }>;
+  searchParams: Promise<{ to?: string; from?: string; amount?: string }>;
+}) {
+  const [{ kind }, sp, setup] = await Promise.all([
+    params,
+    searchParams,
+    getSetup(),
+  ]);
   if (!KINDS.includes(kind as TransferKind)) notFound();
   const k = kind as TransferKind;
+  if (k === "internal" && usesEngineBanking()) {
+    const accounts = await load(b => b.listAccounts());
+    return <><BankHead title="Send to a same-bank member" back={{ href: "/account/banking/send", label: "All ways to send" }} />{accounts.ok ? <BankMembersPanel accounts={accounts.data.items} /> : <ErrorPanel error={accounts.error} />}</>;
+  }
   const [accounts, recipients, options] = await Promise.all([
     load((b) => b.listAccounts()),
-    k === "own" ? Promise.resolve({ ok: true as const, data: [] }) : load((b) => b.listRecipients(k as "external" | "internal")),
+    k === "own"
+      ? Promise.resolve({ ok: true as const, data: [] })
+      : load((b) => b.listRecipients(k as "external" | "internal")),
     load((b) => b.transferOptions(k)),
   ]);
   return (
     <>
-      <BankHead title={k === "own" ? "Move money" : "Send money"} back={{ href: "/account/banking/send", label: "All ways to send" }} />
-      {!accounts.ok ? <ErrorPanel error={accounts.error} /> : !recipients.ok ? <ErrorPanel error={recipients.error} /> : (
+      <BankHead
+        title={k === "own" ? "Move money" : "Send money"}
+        back={{ href: "/account/banking/send", label: "All ways to send" }}
+      />
+      {!accounts.ok ? (
+        <ErrorPanel error={accounts.error} />
+      ) : !recipients.ok ? (
+        <ErrorPanel error={recipients.error} />
+      ) : !options.ok ? (
+        <ErrorPanel error={options.error} />
+      ) : (
         <div className="mn-sendgrid">
-          <SendFlow kind={k} bank={setup.brand.name} sample={bankingMode() === "sample"} accounts={accounts.data.items} recipients={recipients.data}
-            speeds={options.ok ? options.data.speeds : undefined} initialTo={sp.to} initialFrom={sp.from} initialAmount={sp.amount} />
+          <SendFlow
+            engine={usesEngineBanking()}
+            kind={k}
+            bank={setup.brand.name}
+            sample={bankingMode() === "sample"}
+            accounts={accounts.data.items}
+            recipients={
+              usesEngineBanking()
+                ? recipients.data.filter(
+                    (recipient) => recipient.verificationStatus === "verified"
+                  )
+                : recipients.data
+            }
+            speeds={options.data.speeds}
+            schedulingSupported={options.data.schedulingSupported}
+            initialTo={sp.to}
+            initialFrom={sp.from}
+            initialAmount={sp.amount}
+          />
           {options.ok && <SendAside options={options.data} />}
         </div>
       )}

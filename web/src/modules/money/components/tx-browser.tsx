@@ -24,7 +24,6 @@ export async function TxBrowser({ sp, accounts, accountId, basePath }: { sp: TxS
   const state: TxFilterState = {
     q: one(sp.q), dir: one(sp.dir), cat: one(sp.cat), range: one(sp.range), status: one(sp.status), acct: accountId ? undefined : one(sp.acct),
   };
-  const pages = Math.max(1, Math.min(10, Number(one(sp.n)) || 1));
   const query: TransactionQuery = {
     accountId: accountId || state.acct,
     q: state.q,
@@ -32,7 +31,8 @@ export async function TxBrowser({ sp, accounts, accountId, basePath }: { sp: TxS
     status: state.status === "pending" ? "pending" : undefined,
     category: state.cat && state.cat in CATEGORY_LABEL ? (state.cat as TxCategory) : undefined,
     from: rangeFrom(state.range),
-    limit: 50 * pages,
+    limit: 50,
+    cursor: one(sp.cursor),
   };
   const res = await load((b) => b.listTransactions(query));
   const filtered = !!(state.q || state.dir || state.cat || state.status || state.acct || (state.range && state.range !== "90"));
@@ -44,8 +44,13 @@ export async function TxBrowser({ sp, accounts, accountId, basePath }: { sp: TxS
   const moreHref = (() => {
     const p = new URLSearchParams();
     for (const [k, v] of Object.entries(state)) if (v) p.set(k, v);
-    p.set("n", String(pages + 1));
+    if (res.ok && res.data.nextCursor) p.set("cursor", res.data.nextCursor);
     return `${basePath}?${p}`;
+  })();
+  const newestHref = (() => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(state)) if (v) p.set(k, v);
+    return `${basePath}${p.size ? `?${p}` : ""}`;
   })();
 
   return (
@@ -71,8 +76,11 @@ export async function TxBrowser({ sp, accounts, accountId, basePath }: { sp: TxS
       ) : (
         <>
           <TxList items={res.data.items} accounts={accounts} showAccount={!accountId && accounts.length > 1} />
-          {res.data.nextCursor && (
-            <div className="mn-more"><Link className="btn ghost sm" href={moreHref} scroll={false}>Show more</Link></div>
+          {(query.cursor || res.data.nextCursor) && (
+            <div className="mn-more">
+              {query.cursor && <Link className="btn ghost sm" href={newestHref} scroll={false}>Newest transactions</Link>}
+              {res.data.nextCursor && <Link className="btn ghost sm" href={moreHref} scroll={false}>Older transactions</Link>}
+            </div>
           )}
         </>
       )}

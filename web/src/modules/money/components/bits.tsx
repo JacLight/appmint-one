@@ -45,7 +45,8 @@ export function StatusChip({ status }: { status: TxStatus | string }) {
   const label: Record<string, string> = {
     pending: "Pending", posted: "Posted", returned: "Returned", canceled: "Canceled", completed: "Completed", processing: "Processing",
     scheduled: "Scheduled", failed: "Failed", open: "Open", paid: "Paid", declined: "Declined", expired: "Expired",
-    active: "Active", frozen: "Frozen", inactive: "Not activated", closed: "Closed",
+    active: "Active", frozen: "Frozen", inactive: "Not activated", closed: "Closed", dormant: "Dormant", reversed: "Reversed",
+    ordered: "Ordered", issued: "Issued", lost: "Lost", stolen: "Stolen", replaced: "Replaced",
   };
   return <span className={`mn-chip s-${status}`}>{label[status] || status}</span>;
 }
@@ -120,8 +121,8 @@ export function CardArt({ card, brand, small }: { card: Pick<Card, "last4" | "na
       <div className="mn-ca-num">•••• {card.last4}</div>
       <div className="mn-ca-bot">
         {!small && <span>{card.nameOnCard}</span>}
-        <span>{String(card.expMonth).padStart(2, "0")}/{String(card.expYear).slice(-2)}</span>
-        <span className="mn-ca-net">{card.network === "visa" ? "VISA" : "mastercard"}</span>
+        <span>{card.expMonth && card.expYear ? `${String(card.expMonth).padStart(2, "0")}/${String(card.expYear).slice(-2)}` : "Not issued"}</span>
+        <span className="mn-ca-net">{card.network === "visa" ? "VISA" : card.network === "mastercard" ? "mastercard" : "Debit"}</span>
       </div>
       {card.status === "frozen" && <span className="mn-ca-frost"><Icon name="snow" size={small ? 18 : 26} /> Frozen</span>}
     </div>

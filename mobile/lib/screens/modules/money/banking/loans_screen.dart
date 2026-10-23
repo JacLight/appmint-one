@@ -38,15 +38,19 @@ class _LoansScreenState extends State<LoansScreen> {
     final id = BankingProvider.idOf(loan);
     if (id.isEmpty) return;
     context.read<BankingProvider>().openLoanView(id, known: loan);
-    Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => LoanDetailScreen(loanId: id)));
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => LoanDetailScreen(loanId: id)));
   }
 
   void _openApplication(Map<String, dynamic> application) {
     final id = BankingProvider.idOf(application);
     if (id.isEmpty) return;
-    Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => LoanApplicationScreen(applicationId: id)));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LoanApplicationScreen(applicationId: id),
+      ),
+    );
   }
 
   @override
@@ -74,16 +78,23 @@ class _LoansScreenState extends State<LoansScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                  SSpace.lg, SSpace.xxl + SSpace.sm, SSpace.lg, SSpace.lg),
+                SSpace.lg,
+                SSpace.xxl + SSpace.sm,
+                SSpace.lg,
+                SSpace.lg,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('BORROWING',
-                      style: TextStyle(
-                          color: SColors.faint,
-                          fontSize: 10.5,
-                          letterSpacing: 2,
-                          fontWeight: FontWeight.w700)),
+                  const Text(
+                    'BORROWING',
+                    style: TextStyle(
+                      color: SColors.faint,
+                      fontSize: 10.5,
+                      letterSpacing: 2,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: SSpace.sm),
                   // Nothing owed and no loans is not the same as a figure the
                   // app never received, so the two read differently.
@@ -106,7 +117,9 @@ class _LoansScreenState extends State<LoansScreen> {
                           ? 'Owed on 1 loan'
                           : 'Owed across ${b.loans.length} loans',
                       style: const TextStyle(
-                          fontSize: 12.5, color: SColors.muted),
+                        fontSize: 12.5,
+                        color: SColors.muted,
+                      ),
                     ),
                   ],
                 ],
@@ -123,7 +136,8 @@ class _LoansScreenState extends State<LoansScreen> {
                   title: late.length == 1
                       ? 'A loan is past due'
                       : '${late.length} loans are past due',
-                  body: 'Paying brings it current. A payment comes out of one '
+                  body:
+                      'Paying brings it current. A payment comes out of one '
                       'of your own accounts.',
                   action: 'Open',
                   onAction: () => _openLoan(late.first),
@@ -133,7 +147,11 @@ class _LoansScreenState extends State<LoansScreen> {
             if (pending.isNotEmpty)
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                    SSpace.lg, late.isEmpty ? 0 : SSpace.sm, SSpace.lg, 0),
+                  SSpace.lg,
+                  late.isEmpty ? 0 : SSpace.sm,
+                  SSpace.lg,
+                  0,
+                ),
                 child: _Callout(
                   icon: Icons.mark_email_unread_outlined,
                   tone: SColors.clay2,
@@ -150,10 +168,21 @@ class _LoansScreenState extends State<LoansScreen> {
             if (b.loansError != null)
               Padding(
                 padding: const EdgeInsets.all(SSpace.lg),
-                child:
-                    ModuleError(message: b.loansError!, onRetry: b.loadLoans),
+                child: ModuleError(
+                  message: b.loansError!,
+                  onRetry: b.loadLoans,
+                ),
               ),
 
+            for (final section in ['applications', 'loanProducts'])
+              if (b.sectionError(section) != null)
+                Padding(
+                  padding: const EdgeInsets.all(SSpace.lg),
+                  child: ModuleError(
+                    message: '$section: ${b.sectionError(section)}',
+                    onRetry: b.loadLoans,
+                  ),
+                ),
             if (b.loansLoading && b.loans.isEmpty) const ModuleLoading(),
 
             if (b.loans.isNotEmpty) ...[
@@ -161,7 +190,11 @@ class _LoansScreenState extends State<LoansScreen> {
               for (final loan in b.loans)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
-                      SSpace.lg, 0, SSpace.lg, SSpace.md),
+                    SSpace.lg,
+                    0,
+                    SSpace.lg,
+                    SSpace.md,
+                  ),
                   child: LoanCard(loan: loan, onTap: () => _openLoan(loan)),
                 ),
             ],
@@ -174,8 +207,9 @@ class _LoansScreenState extends State<LoansScreen> {
                   children: [
                     for (final a in applications)
                       ApplicationRow(
-                          application: a,
-                          onTap: () => _openApplication(a)),
+                        application: a,
+                        onTap: () => _openApplication(a),
+                      ),
                   ],
                 ),
               ),
@@ -183,6 +217,7 @@ class _LoansScreenState extends State<LoansScreen> {
 
             if (!b.loansLoading &&
                 b.loansError == null &&
+                b.sectionError('applications') == null &&
                 b.loans.isEmpty &&
                 applications.isEmpty)
               const Padding(
@@ -190,22 +225,29 @@ class _LoansScreenState extends State<LoansScreen> {
                 child: ModuleEmpty(
                   icon: Icons.account_balance_wallet_outlined,
                   title: 'No borrowing yet',
-                  body: 'When you apply for a loan it appears here, with where '
+                  body:
+                      'When you apply for a loan it appears here, with where '
                       'it stands and what you owe.',
                 ),
               ),
 
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                  SSpace.lg, SSpace.xl, SSpace.lg, 0),
+                SSpace.lg,
+                SSpace.xl,
+                SSpace.lg,
+                0,
+              ),
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const LoanApplyScreen())),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LoanApplyScreen()),
+                  ),
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: Text(
-                      b.loans.isEmpty ? 'Apply for a loan' : 'Apply for another'),
+                    b.loans.isEmpty ? 'Apply for a loan' : 'Apply for another',
+                  ),
                 ),
               ),
             ),
@@ -235,46 +277,54 @@ class _Callout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(SSpace.md),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(SRadius.md),
-          border: Border.all(color: tone.withValues(alpha: 0.5)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 18, color: tone),
-            const SizedBox(width: SSpace.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13.5,
-                          color: tone)),
-                  const SizedBox(height: 2),
-                  Text(body,
-                      style: TextStyle(
-                          fontSize: 12,
-                          height: 1.35,
-                          color: tone.withValues(alpha: 0.85))),
-                ],
+    padding: const EdgeInsets.all(SSpace.md),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(SRadius.md),
+      border: Border.all(color: tone.withValues(alpha: 0.5)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: tone),
+        const SizedBox(width: SSpace.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13.5,
+                  color: tone,
+                ),
               ),
-            ),
-            TextButton(
-              onPressed: onAction,
-              style: TextButton.styleFrom(
-                  foregroundColor: tone,
-                  padding: const EdgeInsets.symmetric(horizontal: SSpace.sm),
-                  minimumSize: const Size(0, 32)),
-              child: Text(action,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 12.5)),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                body,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: tone.withValues(alpha: 0.85),
+                ),
+              ),
+            ],
+          ),
         ),
-      );
+        TextButton(
+          onPressed: onAction,
+          style: TextButton.styleFrom(
+            foregroundColor: tone,
+            padding: const EdgeInsets.symmetric(horizontal: SSpace.sm),
+            minimumSize: const Size(0, 32),
+          ),
+          child: Text(
+            action,
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+          ),
+        ),
+      ],
+    ),
+  );
 }

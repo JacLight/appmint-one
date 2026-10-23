@@ -40,6 +40,7 @@ class _BankingShellState extends State<BankingShell> {
           // screen itself switches between the three.
           MoveMoneyScreen(
             mode: MoveMode.transfer,
+            embedded: true,
             key: ValueKey('move-${b.accounts.length}'),
           ),
           const LoansScreen(),

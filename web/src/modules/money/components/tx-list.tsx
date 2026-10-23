@@ -24,8 +24,8 @@ export function TxList({ items, accounts, showAccount, compact }: { items: Trans
             {g.rows.map((t) => {
               const a = showAccount ? acct(t.accountId) : undefined;
               return (
-                <li key={t.id}>
-                  <Link href={`${TX_BASE}/${t.id}`} className="mn-tx">
+                <li key={`${t.accountId}:${t.id}`}>
+                  <Link href={`${TX_BASE}/${encodeURIComponent(t.id)}?account=${encodeURIComponent(t.accountId)}`} className="mn-tx">
                     <TxAvatar t={t} />
                     <span className="mn-tx-main">
                       <b>{txTitle(t)}</b>

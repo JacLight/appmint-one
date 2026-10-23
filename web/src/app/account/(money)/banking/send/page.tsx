@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSetup } from "@/lib/setup";
-import { load } from "@/modules/money/api/adapter";
+import { load, usesEngineBanking } from "@/modules/money/api/adapter";
 import { BankHead, PersonAvatar } from "@/modules/money/components/bits";
 import { Icon } from "@/modules/money/components/icons";
 import { TxList } from "@/modules/money/components/tx-list";
@@ -14,6 +14,7 @@ const B = "/account/banking";
 export default async function SendPage({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
   const [setup, sp] = await Promise.all([getSetup(), searchParams]);
   const bank = setup.brand.name;
+  const ownOnly = usesEngineBanking();
   const from = sp.from ? `?from=${encodeURIComponent(sp.from)}` : "";
   const [recipients, accounts, recent] = await Promise.all([
     load((b) => b.listRecipients()),
@@ -25,18 +26,18 @@ export default async function SendPage({ searchParams }: { searchParams: Promise
     <>
       <BankHead title="Send money" sub="Pick how you want to send. You’ll see every detail, and any fee, before anything moves." />
       <div className="mn-ways">
-        <Link className="mn-way" href={`${B}/send/external${from}`}>
+        {!ownOnly && <Link className="mn-way" href={`${B}/send/external${from}`}>
           <span className="ic"><Icon name="bank" size={22} /></span>
           <b>To another bank</b>
           <span>Any U.S. bank account, with their routing and account number.</span>
           <em>Standard 1–3 business days · Same day available</em>
-        </Link>
-        <Link className="mn-way" href={`${B}/send/internal${from}`}>
+        </Link>}
+        {!ownOnly && <Link className="mn-way" href={`${B}/send/internal${from}`}>
           <span className="ic"><Icon name="bolt" size={22} /></span>
           <b>To someone at {bank}</b>
           <span>Find them by @handle, email or phone number.</span>
           <em>Instant, any day · Free</em>
-        </Link>
+        </Link>}
         <Link className="mn-way" href={`${B}/send/own${from}`}>
           <span className="ic"><Icon name="swap" size={22} /></span>
           <b>Between your accounts</b>
@@ -44,6 +45,7 @@ export default async function SendPage({ searchParams }: { searchParams: Promise
           <em>Instant · Free</em>
         </Link>
       </div>
+      {ownOnly && <p className="mn-muted">To send to another person or another bank, <Link className="mn-link" href="/account/messages">contact the bank</Link>.</p>}
 
       <div className="mn-grid-main">
         <section className="mn-panel">

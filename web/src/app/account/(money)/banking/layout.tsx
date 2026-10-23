@@ -1,3 +1,6 @@
+import { getSession } from "@/lib/auth";
+import { runtimeEnv } from "@/lib/runtime-env";
+import { BankVerificationProvider } from "@/modules/money/components/bank-verification";
 import { requireModule } from "@/lib/guards";
 import { getSetup } from "@/lib/setup";
 import { bankingMode } from "@/modules/money/api/adapter";
@@ -11,11 +14,13 @@ export default async function BankingLayout({ children }: { children: React.Reac
   await requireModule("money");
   const setup = await getSetup();
   const mode = bankingMode();
+  const session = await getSession();
+  const scope = JSON.stringify([runtimeEnv("ORG_ID"), session.customer?.id]);
   return (
-    <div className="mn">
+    <BankVerificationProvider key={scope} scope={scope}><div className="mn">
       {mode === "sample" && <SampleBanner />}
       {mode === "unavailable" ? <NotAvailable brand={setup.brand.name} /> : children}
       {setup.homeModule === "money" && <BankTabBar />}
-    </div>
+    </div></BankVerificationProvider>
   );
 }

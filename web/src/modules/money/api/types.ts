@@ -2,8 +2,8 @@
  * Banking API contract — what the Money module's screens need from the bank's API.
  *
  * This is the web side of /Users/imzee/projects/docs/APPMINT-MONEY-API-CONTRACT.md.
- * The API itself does not exist yet; the screens talk ONLY to `BankingApi` (see
- * ./adapter.ts), so wiring the real one is one class, no screen changes.
+ * Screens talk ONLY to `BankingApi` (see ./adapter.ts). Custom bank HTTP APIs use
+ * this contract directly; AppEngine's existing customer API uses ./engine.ts.
  *
  * Conventions (same as the doc):
  * - Money is an integer in MINOR units (cents) plus an ISO-4217 currency. The client
@@ -16,8 +16,8 @@
  */
 
 export type Currency = "USD";
-export type ISODate = string;      // "2026-10-20T14:03:11Z"
-export type DateOnly = string;     // "2026-10-20"
+export type ISODate = string; // "2026-10-20T14:03:11Z"
+export type DateOnly = string; // "2026-10-20"
 
 export interface Money {
   /** Minor units (cents). Always positive; direction is carried separately. */
@@ -49,10 +49,22 @@ export interface BankProfile {
 
 /* ───────────────────────── accounts ───────────────────────── */
 
-export type AccountType = "checking" | "savings";
-export type AccountStatus = "open" | "frozen" | "closed";
+export type AccountType =
+  | "checking"
+  | "savings"
+  | "money_market"
+  | "certificate"
+  | "loan";
+export type AccountStatus =
+  | "pending"
+  | "open"
+  | "frozen"
+  | "dormant"
+  | "closed";
 
 export interface Account {
+  gaps?: string[];
+  overdraft?: { optedIn: boolean };
   id: string;
   type: AccountType;
   /** Product name: "Everyday Checking". */
@@ -98,22 +110,41 @@ export interface AccountList {
 /* ───────────────────────── transactions ───────────────────────── */
 
 export type TxDirection = "credit" | "debit";
-export type TxStatus = "pending" | "posted" | "returned" | "canceled";
+export type TxStatus =
+  | "pending"
+  | "posted"
+  | "returned"
+  | "canceled"
+  | "failed"
+  | "reversed";
 export type TxKind =
-  | "card"          // debit card purchase
-  | "atm"           // ATM cash
-  | "ach"           // bank transfer in/out (another bank)
-  | "internal"      // to/from someone at this bank
-  | "own"           // between your own accounts
+  | "card" // debit card purchase
+  | "atm" // ATM cash
+  | "ach" // bank transfer in/out (another bank)
+  | "internal" // to/from someone at this bank
+  | "own" // between your own accounts
   | "wire"
-  | "deposit"       // direct deposit / payroll
+  | "deposit" // direct deposit / payroll
   | "interest"
   | "fee"
   | "refund";
 
 export type TxCategory =
-  | "income" | "transfers" | "groceries" | "dining" | "shopping" | "transport"
-  | "bills" | "housing" | "health" | "entertainment" | "travel" | "cash" | "fees" | "interest" | "other";
+  | "income"
+  | "transfers"
+  | "groceries"
+  | "dining"
+  | "shopping"
+  | "transport"
+  | "bills"
+  | "housing"
+  | "health"
+  | "entertainment"
+  | "travel"
+  | "cash"
+  | "fees"
+  | "interest"
+  | "other";
 
 export interface Counterparty {
   name: string;
@@ -130,6 +161,7 @@ export interface Counterparty {
 }
 
 export interface Transaction {
+  actions?: { dispute?: boolean; cancel?: boolean };
   id: string;
   accountId: string;
   direction: TxDirection;
@@ -178,6 +210,7 @@ export interface TransactionQuery {
 export type RecipientKind = "external" | "internal";
 
 export interface Recipient {
+  verificationStatus?: string;
   id: string;
   kind: RecipientKind;
   /** Account holder name (external) or member name (internal). */
@@ -215,15 +248,32 @@ export interface NewInternalRecipient {
 export type NewRecipient = NewExternalRecipient | NewInternalRecipient;
 
 /** Result of looking up a routing number (bank name) or a member. */
-export interface RoutingLookup { routingNumber: string; bankName: string; valid: boolean }
-export interface MemberLookup { found: boolean; name?: string; handle?: string }
+export interface RoutingLookup {
+  routingNumber: string;
+  bankName: string;
+  valid: boolean;
+}
+export interface MemberLookup {
+  found: boolean;
+  recipientToken?: string;
+  expiresAt?: string;
+  name?: string;
+  handle?: string;
+}
 
 /* ───────────────────────── transfers ───────────────────────── */
 
 /** external = to another bank (ACH), internal = to someone at this bank, own = between your accounts. */
 export type TransferKind = "external" | "internal" | "own";
 export type TransferSpeed = "standard" | "same_day" | "instant";
-export type TransferStatus = "scheduled" | "pending" | "processing" | "completed" | "returned" | "failed" | "canceled";
+export type TransferStatus =
+  | "scheduled"
+  | "pending"
+  | "processing"
+  | "completed"
+  | "returned"
+  | "failed"
+  | "canceled";
 
 export interface TransferInput {
   kind: TransferKind;
@@ -259,7 +309,7 @@ export interface TransferPreview {
   total: Money;
   speed: TransferSpeed;
   /** When the money will arrive. */
-  arrivesBy: DateOnly;
+  arrivesBy?: DateOnly;
   scheduledFor?: DateOnly | null;
   memo?: string;
   /** Available balance after this transfer, as the server sees it. */
@@ -284,7 +334,7 @@ export interface Transfer {
   memo?: string;
   createdAt: ISODate;
   scheduledFor?: DateOnly | null;
-  arrivesBy: DateOnly;
+  arrivesBy?: DateOnly;
   /** Customer-facing confirmation number. */
   reference: string;
 }
@@ -304,11 +354,12 @@ export interface TransferSpeedOption {
 export interface TransferOptions {
   kind: TransferKind;
   /** Largest total the customer may send this way per day. */
-  dailyLimit: Money;
+  dailyLimit?: Money;
   /** Already sent (or scheduled for) today this way. */
-  sentToday: Money;
+  sentToday?: Money;
   /** dailyLimit − sentToday, computed by the server. */
-  remainingToday: Money;
+  remainingToday?: Money;
+  schedulingSupported?: boolean;
   speeds: TransferSpeedOption[];
   /** Same-day / processing cut-off in plain words, e.g. "4:00 PM CT on business days". */
   cutoff?: string;
@@ -318,7 +369,12 @@ export interface TransferOptions {
 
 /* ───────────────────────── step-up (security) ───────────────────────── */
 
-export type StepUpAction = "transfer" | "add_recipient" | "reveal_account_number" | "card_limits" | "pay_request";
+export type StepUpAction =
+  | "transfer"
+  | "add_recipient"
+  | "reveal_account_number"
+  | "card_limits"
+  | "pay_request";
 export type StepUpMethod = "sms" | "email" | "totp";
 
 export interface StepUpRequirement {
@@ -337,7 +393,12 @@ export interface StepUpChallenge {
 }
 
 /** Sent with any action that required step-up. */
-export interface StepUpProof { challengeId: string; code: string }
+export interface StepUpProof {
+  challengeId: string;
+  code: string;
+  /** Opaque bank-domain proof after enrolled authenticator verification. */
+  proof?: string;
+}
 
 /* ───────────────────────── receive ───────────────────────── */
 
@@ -345,7 +406,7 @@ export interface ReceiveDetails {
   accountId: string;
   accountHolder: string;
   bankName: string;
-  bankAddress: string;
+  bankAddress?: string;
   accountType: AccountType;
   routingNumber: string;
   /** Wire routing number if different from ACH routing. */
@@ -353,11 +414,20 @@ export interface ReceiveDetails {
   accountMask: string;
   /** Present only when revealed with a step-up proof. */
   accountNumber?: string;
+  /** Existing owner-visible details may use a local Show/Hide privacy control. */
+  revealRequiresVerification?: boolean;
+  notes?: string[];
 }
 
 /* ───────────────────────── requests ───────────────────────── */
 
-export type RequestStatus = "open" | "paid" | "declined" | "canceled" | "expired";
+export type RequestStatus =
+  | "processing"
+  | "open"
+  | "paid"
+  | "declined"
+  | "canceled"
+  | "expired";
 
 export interface MoneyRequest {
   id: string;
@@ -417,14 +487,17 @@ export type CardStatus = "active" | "frozen" | "inactive" | "closed";
 
 export interface CardLimit {
   /** Current limit per day. */
-  limit: Money;
+  limit: Money | null;
   /** The most the customer may set. */
-  max: Money;
+  max: Money | null;
   /** Used so far today. */
-  used: Money;
+  used?: Money;
 }
 
 export interface Card {
+  issuanceStatus?: string;
+  controls?: Record<string, number | null>;
+  bankLimits?: Record<string, number | null>;
   id: string;
   accountId: string;
   type: "debit";
@@ -436,6 +509,8 @@ export interface Card {
   expMonth: number;
   expYear: number;
   status: CardStatus;
+  limitsEditable?: boolean;
+  freezeEditable?: boolean;
   limits: {
     purchasesDaily: CardLimit;
     atmDaily: CardLimit;
@@ -446,8 +521,8 @@ export interface Card {
 }
 
 export interface CardLimitsInput {
-  purchasesDaily?: number;   // minor units
-  atmDaily?: number;         // minor units
+  purchasesDaily?: number; // minor units
+  atmDaily?: number; // minor units
 }
 
 /* ───────────────────────── errors ───────────────────────── */
@@ -468,7 +543,12 @@ export type BankErrorCode =
   | "UNAVAILABLE";
 
 export class BankError extends Error {
-  constructor(public code: BankErrorCode, message: string, public field?: string, public status = 400) {
+  constructor(
+    public code: BankErrorCode,
+    message: string,
+    public field?: string,
+    public status = 400
+  ) {
     super(message);
     this.name = "BankError";
   }
@@ -480,30 +560,70 @@ export class BankError extends Error {
 /* ───────────── identity (CIP / KYC), the customer's side ───────────── */
 
 /** Where my identity check is. The bank's own findings (risk, screening, notes) are never sent. */
-export type IdentityStatus = "not_started" | "submitted" | "in_review" | "verified" | "needs_info" | "rejected";
-export type IdentityDocType = "passport" | "national_id" | "drivers_license" | "residence_permit" | "visa" | "voter_id" | "military_id" | "other";
-export type IdentityFileKind = "id_front" | "id_back" | "proof_of_address" | "selfie";
-export type ProofOfAddressType = "utility_bill" | "bank_statement" | "tax_document" | "government_letter" | "lease_agreement" | "other";
+export type IdentityStatus =
+  | "not_started"
+  | "submitted"
+  | "in_review"
+  | "verified"
+  | "needs_info"
+  | "rejected";
+export type IdentityDocType =
+  | "passport"
+  | "national_id"
+  | "drivers_license"
+  | "residence_permit"
+  | "visa"
+  | "voter_id"
+  | "military_id"
+  | "other";
+export type IdentityFileKind =
+  | "id_front"
+  | "id_back"
+  | "proof_of_address"
+  | "selfie";
+export type ProofOfAddressType =
+  | "utility_bill"
+  | "bank_statement"
+  | "tax_document"
+  | "government_letter"
+  | "lease_agreement"
+  | "other";
 
 export interface IdentityAddress {
-  street1: string | null; street2?: string | null; city: string | null; state?: string | null; postalCode: string | null; country: string | null;
+  street1: string | null;
+  street2?: string | null;
+  city: string | null;
+  state?: string | null;
+  postalCode: string | null;
+  country: string | null;
 }
-export interface IdentityFile { path: string }
+export interface IdentityFile {
+  path: string;
+}
 export interface IdentityDocumentView {
   documentType: IdentityDocType | null;
   /** Last 4 only, masked by the bank. */
   documentNumber: string | null;
-  issuingCountry: string | null; issuingAuthority: string | null;
-  issueDate: string | null; expiryDate: string | null; expired: boolean;
-  front: IdentityFile | null; back: IdentityFile | null;
+  issuingCountry: string | null;
+  issuingAuthority: string | null;
+  issueDate: string | null;
+  expiryDate: string | null;
+  expired: boolean;
+  front: IdentityFile | null;
+  back: IdentityFile | null;
 }
 export interface IdentityDetails {
-  firstName: string | null; middleName: string | null; lastName: string | null;
-  dateOfBirth: string | null; nationality: string | null;
+  firstName: string | null;
+  middleName: string | null;
+  lastName: string | null;
+  dateOfBirth: string | null;
+  nationality: string | null;
   address: IdentityAddress;
-  tinOnFile: boolean; tinLast4: string | null;
+  tinOnFile: boolean;
+  tinLast4: string | null;
   identityDocuments: IdentityDocumentView[];
-  proofOfAddress: IdentityFile | null; selfie: IdentityFile | null;
+  proofOfAddress: IdentityFile | null;
+  selfie: IdentityFile | null;
 }
 export interface IdentityView {
   status: IdentityStatus;
@@ -518,27 +638,119 @@ export interface IdentityView {
   requestedInfo: { message: string; at: string | null } | null;
   changeRequests: { at: string; details: string; done: boolean }[];
   /** My accounts that open once I'm verified, and what each still needs. */
-  accountsWaiting: { sk: string; accountNumber: string | null; nickname?: string | null; kind?: string | null; gaps: string[] }[];
+  accountsWaiting: {
+    sk: string;
+    accountNumber: string | null;
+    nickname?: string | null;
+    kind?: string | null;
+    gaps: string[];
+  }[];
   /** Set when a verified customer's update went to the bank as a change request. */
   changeRequest?: { sent: boolean; message: string };
 }
 export interface IdentityInput {
-  firstName?: string; middleName?: string; lastName?: string; dateOfBirth?: string; nationality?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  nationality?: string;
   /** SSN or ITIN, 9 digits. Only sent when typed; never read back in full. */
   taxId?: string;
-  address?: { street1: string; street2?: string; city: string; state?: string; postalCode: string; country: string };
-  identityDocument?: { documentType: IdentityDocType; documentNumber: string; issuingCountry?: string; issuingAuthority?: string; issueDate?: string; expiryDate: string };
+  address?: {
+    street1: string;
+    street2?: string;
+    city: string;
+    state?: string;
+    postalCode: string;
+    country: string;
+  };
+  identityDocument?: {
+    documentType: IdentityDocType;
+    documentNumber: string;
+    issuingCountry?: string;
+    issuingAuthority?: string;
+    issueDate?: string;
+    expiryDate: string;
+  };
 }
-export interface IdentityFileInput { kind: IdentityFileKind; path: string; documentType?: IdentityDocType; proofType?: ProofOfAddressType; proofDate?: string }
+export interface IdentityFileInput {
+  kind: IdentityFileKind;
+  path: string;
+  documentType?: IdentityDocType;
+  proofType?: ProofOfAddressType;
+  proofDate?: string;
+}
 
 export interface BankingApi {
+  /** Existing AppEngine customer servicing routes; optional for custom/sample adapters. */
+  setPersonalCardLimits?(
+    id: string,
+    controls: Record<string, number | null>
+  ): Promise<Card>;
+  startPayeeVerification?(id: string): Promise<Recipient>;
+  confirmPayeeVerification?(id: string, amounts: number[]): Promise<Recipient>;
+  accountProducts?(): Promise<any[]>;
+  openBankAccount?(input: {
+    product: string;
+    nickname?: string;
+    business?: Record<string, unknown>;
+  }): Promise<any>;
+  renameBankAccount?(id: string, nickname: string): Promise<any>;
+  setBankOverdraft?(id: string, optedIn: boolean): Promise<any>;
+  orderBankCard?(
+    account: string,
+    input: { form: string; shipping?: Record<string, unknown> }
+  ): Promise<any>;
+  activateBankCard?(id: string, last4: string): Promise<any>;
+  replaceBankCard?(
+    id: string,
+    why: string,
+    shipping?: Record<string, unknown>
+  ): Promise<any>;
+  listDisputes?(): Promise<any[]>;
+  fileDispute?(input: {
+    transaction: string;
+    reason: string;
+    description: string;
+  }): Promise<any>;
+  withdrawDispute?(id: string, verification?: Record<string, unknown>): Promise<any>;
+  cancelTransaction?(id: string, verification?: Record<string, unknown>): Promise<any>;
+  updateLoanApplication?(
+    id: string,
+    changes: Record<string, unknown>
+  ): Promise<any>;
+  attachLoanDocument?(
+    id: string,
+    input: { path: string; kind?: string; note?: string }
+  ): Promise<any>;
+  respondToLoanCondition?(
+    id: string,
+    index: number,
+    input: {
+      text?: string;
+      documents?: { path: string; kind?: string; note?: string }[];
+    }
+  ): Promise<any>;
+  listLoans?(): Promise<any[]>;
+  listLoanApplications?(): Promise<any[]>;
+  loan?(id: string): Promise<any>;
+  loanApplication?(id: string): Promise<any>;
+  loanProducts?(): Promise<any[]>;
+  applyForLoan?(input: Record<string, unknown>): Promise<any>;
+  withdrawLoanApplication?(id: string): Promise<any>;
+  answerLoanCounteroffer?(id: string, accept: boolean): Promise<any>;
+  payLoan?(
+    id: string,
+    input: { from: string; amount: number; idempotencyKey: string; bankingProof?: string }
+  ): Promise<any>;
+
   profile(): Promise<BankProfile>;
 
   listAccounts(): Promise<AccountList>;
   getAccount(id: string): Promise<Account>;
 
   listTransactions(query: TransactionQuery): Promise<Page<Transaction>>;
-  getTransaction(id: string): Promise<Transaction>;
+  getTransaction(id: string, accountId?: string): Promise<Transaction>;
 
   listRecipients(kind?: RecipientKind): Promise<Recipient[]>;
   getRecipient(id: string): Promise<Recipient>;
@@ -550,29 +762,54 @@ export interface BankingApi {
 
   transferOptions(kind: TransferKind): Promise<TransferOptions>;
   previewTransfer(input: TransferInput): Promise<TransferPreview>;
-  submitTransfer(previewId: string, idempotencyKey: string, proof?: StepUpProof): Promise<Transfer>;
+  submitTransfer(
+    previewId: string,
+    idempotencyKey: string,
+    proof?: StepUpProof
+  ): Promise<Transfer>;
   getTransfer(id: string): Promise<Transfer>;
-  listTransfers(query?: { status?: TransferStatus; limit?: number }): Promise<Page<Transfer>>;
+  listTransfers(query?: {
+    status?: TransferStatus;
+    limit?: number;
+  }): Promise<Page<Transfer>>;
   cancelTransfer(id: string): Promise<Transfer>;
 
-  startStepUp(action: StepUpAction, method?: StepUpMethod): Promise<StepUpChallenge>;
+  startStepUp(
+    action: StepUpAction,
+    method?: StepUpMethod
+  ): Promise<StepUpChallenge>;
 
-  receiveDetails(accountId: string, proof?: StepUpProof): Promise<ReceiveDetails>;
+  receiveDetails(
+    accountId: string,
+    proof?: StepUpProof
+  ): Promise<ReceiveDetails>;
 
   listRequests(direction?: "outgoing" | "incoming"): Promise<MoneyRequest[]>;
   createRequest(input: NewMoneyRequest): Promise<MoneyRequest>;
   cancelRequest(id: string): Promise<MoneyRequest>;
   declineRequest(id: string): Promise<MoneyRequest>;
-  payRequest(id: string, fromAccountId: string, idempotencyKey: string, proof?: StepUpProof): Promise<Transfer>;
+  payRequest(
+    id: string,
+    fromAccountId: string,
+    idempotencyKey: string,
+    proof?: StepUpProof
+  ): Promise<Transfer>;
 
-  listStatements(query?: { accountId?: string; year?: number }): Promise<Statement[]>;
+  listStatements(query?: {
+    accountId?: string;
+    year?: number;
+  }): Promise<Statement[]>;
   getStatement(id: string): Promise<StatementDetail>;
 
   listCards(): Promise<Card[]>;
   getCard(id: string): Promise<Card>;
   freezeCard(id: string): Promise<Card>;
   unfreezeCard(id: string): Promise<Card>;
-  setCardLimits(id: string, input: CardLimitsInput, proof: StepUpProof): Promise<Card>;
+  setCardLimits(
+    id: string,
+    input: CardLimitsInput,
+    proof: StepUpProof
+  ): Promise<Card>;
 
   identity(): Promise<IdentityView>;
   submitIdentity(input: IdentityInput): Promise<IdentityView>;

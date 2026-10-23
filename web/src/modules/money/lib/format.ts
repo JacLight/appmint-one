@@ -28,7 +28,9 @@ export const mask = (last4: string) => `••${last4}`;
 /** "Everyday Checking ••4021" */
 export const accountLabel = (a: { name: string; nickname?: string; mask: string }) => `${a.nickname || a.name} ${mask(a.mask)}`;
 
-export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = { checking: "Checking", savings: "Savings" };
+export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
+  checking: "Checking", savings: "Savings", money_market: "Money market", certificate: "Certificate", loan: "Loan",
+};
 
 /** ABA routing checksum (3-7-1). The bank re-checks it; this only helps typing. */
 export function isValidRouting(rn: string): boolean {
@@ -39,10 +41,12 @@ export function isValidRouting(rn: string): boolean {
 
 /** Parse what someone typed ("1,250.5") into cents. Returns null when it isn't an amount. */
 export function parseAmount(input: string): number | null {
-  const s = input.replace(/[$,\s]/g, "");
-  if (!/^\d+(\.\d{0,2})?$/.test(s)) return null;
+  const raw = input.trim().replace(/^\$\s*/, "");
+  if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{0,2})?$/.test(raw)) return null;
+  const s = raw.replace(/,/g, "");
   const [w, f = ""] = s.split(".");
-  return Number(w) * 100 + Number((f + "00").slice(0, 2));
+  const cents = Number(w) * 100 + Number((f + "00").slice(0, 2));
+  return Number.isSafeInteger(cents) ? cents : null;
 }
 
 export const CATEGORY_LABEL: Record<TxCategory, string> = {

@@ -5,7 +5,9 @@ import '../../../../config/setup.dart';
 import '../../../../config/stowbo_theme.dart';
 import '../../../../providers/banking_provider.dart';
 import '../../../../services/banking_api.dart';
+import '../../../../services/banking_dispute_reasons.dart';
 import '../../shared/module_states.dart';
+import 'disputes_screen.dart';
 
 /// One transaction, and the two things a person can do about it: stop it if
 /// it has not gone, or dispute it if it has.
@@ -33,8 +35,15 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     final currency = '${_t['currency'] ?? 'USD'}';
     final status = '${_t['status'] ?? ''}'.toLowerCase();
     final incoming = '${_t['direction'] ?? ''}'.toLowerCase() == 'in';
-    final posted = status == 'posted';
-    final stoppable = status == 'pending';
+    final actions = _t['actions'];
+    final hasClaim = b.disputes.any(
+      (claim) =>
+          '${claim['transaction']}' == _id &&
+          !['lost', 'withdrawn'].contains(claim['status']),
+    );
+    final canDispute =
+        !hasClaim && actions is Map && actions['dispute'] == true;
+    final stoppable = actions is Map && actions['cancel'] == true;
     final network = _t['network'];
 
     return Scaffold(
@@ -42,13 +51,22 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
       appBar: AppBar(
         backgroundColor: SColors.paper,
         surfaceTintColor: Colors.transparent,
-        title: const Text('Transaction',
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w700, color: SColors.ink)),
+        title: const Text(
+          'Transaction',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: SColors.ink,
+          ),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
-            SSpace.lg, SSpace.lg, SSpace.lg, SSpace.xxl),
+          SSpace.lg,
+          SSpace.lg,
+          SSpace.lg,
+          SSpace.xxl,
+        ),
         children: [
           Center(
             child: Column(
@@ -63,10 +81,11 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: SSpace.xs),
-                Text('${_t['description'] ?? _t['kind'] ?? ''}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: SColors.muted, fontSize: 14)),
+                Text(
+                  '${_t['description'] ?? _t['kind'] ?? ''}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: SColors.muted, fontSize: 14),
+                ),
                 const SizedBox(height: SSpace.md),
                 _StatusPill(status: status),
               ],
@@ -98,9 +117,10 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                   _Fact(k: 'Trace', v: '${network['traceNumber']}'),
                 if (network is Map && network['returnCode'] != null)
                   _Fact(
-                      k: 'Return code',
-                      v: '${network['returnCode']}',
-                      danger: true),
+                    k: 'Return code',
+                    v: '${network['returnCode']}',
+                    danger: true,
+                  ),
               ],
             ),
           ),
@@ -112,9 +132,14 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                 color: SColors.greenSoft,
                 borderRadius: BorderRadius.circular(SRadius.md),
               ),
-              child: Text(_note!,
-                  style: const TextStyle(
-                      color: SColors.green2, fontSize: 13, height: 1.4)),
+              child: Text(
+                _note!,
+                style: const TextStyle(
+                  color: SColors.green2,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
             ),
           ],
           if (_error != null) ...[
@@ -122,6 +147,14 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
             ModuleError(message: _error!),
           ],
           const SizedBox(height: SSpace.xl),
+          if (hasClaim)
+            TextButton.icon(
+              onPressed: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const DisputesScreen())),
+              icon: const Icon(Icons.gavel_outlined),
+              label: const Text('Track this dispute'),
+            ),
           if (stoppable)
             SizedBox(
               width: double.infinity,
@@ -129,10 +162,12 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: SColors.danger,
                   side: BorderSide(
-                      color: SColors.danger.withValues(alpha: 0.5)),
+                    color: SColors.danger.withValues(alpha: 0.5),
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: SSpace.md + 2),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(SRadius.pill)),
+                    borderRadius: BorderRadius.circular(SRadius.pill),
+                  ),
                 ),
                 onPressed: b.busy
                     ? null
@@ -142,17 +177,23 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                         setState(() {
                           _error = err;
                           if (err == null) {
-                            _t = {..._t, 'status': 'cancelled'};
+                            _t = {
+                              ..._t,
+                              'status': 'cancelled',
+                              'actions': {'dispute': false, 'cancel': false},
+                            };
                             _note = 'Stopped. It will not go out.';
                           }
                         });
                       },
                 icon: const Icon(Icons.block_rounded, size: 18),
-                label: const Text('Stop this payment',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
+                label: const Text(
+                  'Stop this payment',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
             )
-          else if (posted)
+          else if (canDispute)
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -161,12 +202,15 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                   side: const BorderSide(color: SColors.line),
                   padding: const EdgeInsets.symmetric(vertical: SSpace.md + 2),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(SRadius.pill)),
+                    borderRadius: BorderRadius.circular(SRadius.pill),
+                  ),
                 ),
                 onPressed: () => _dispute(context),
                 icon: const Icon(Icons.gavel_rounded, size: 18),
-                label: const Text("Something's wrong with this",
-                    style: TextStyle(fontWeight: FontWeight.w700)),
+                label: const Text(
+                  "Something's wrong with this",
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
             ),
         ],
@@ -178,8 +222,18 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     final d = DateTime.tryParse(raw)?.toLocal();
     if (d == null) return raw;
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final h = d.hour.toString().padLeft(2, '0');
     final m = d.minute.toString().padLeft(2, '0');
@@ -191,15 +245,9 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   void _dispute(BuildContext context) {
     final b = context.read<BankingProvider>();
     final description = TextEditingController();
-    var reason = 'not_recognised';
+    var reason = 'unauthorized';
 
-    const reasons = {
-      'not_recognised': 'I do not recognise it',
-      'duplicate': 'Charged twice',
-      'wrong_amount': 'Wrong amount',
-      'not_received': 'Paid for something I never got',
-      'cancelled': 'I cancelled this',
-    };
+    const reasons = bankingDisputeReasons;
 
     showModalBottomSheet<void>(
       context: context,
@@ -221,9 +269,10 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('What is wrong?',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 17)),
+                const Text(
+                  'What is wrong?',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                ),
                 const SizedBox(height: SSpace.md),
                 for (final entry in reasons.entries)
                   GestureDetector(
@@ -233,14 +282,14 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                       padding: const EdgeInsets.all(SSpace.md),
                       decoration: BoxDecoration(
                         color: reason == entry.key
-                            ? CurrentSetup.brand.primary
-                                .withValues(alpha: 0.07)
+                            ? CurrentSetup.brand.primary.withValues(alpha: 0.07)
                             : SColors.paper,
                         borderRadius: BorderRadius.circular(SRadius.md),
                         border: Border.all(
-                            color: reason == entry.key
-                                ? CurrentSetup.brand.primary
-                                : SColors.line),
+                          color: reason == entry.key
+                              ? CurrentSetup.brand.primary
+                              : SColors.line,
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -255,8 +304,10 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                           ),
                           const SizedBox(width: SSpace.md),
                           Expanded(
-                            child: Text(entry.value,
-                                style: const TextStyle(fontSize: 13.5)),
+                            child: Text(
+                              entry.value,
+                              style: const TextStyle(fontSize: 13.5),
+                            ),
                           ),
                         ],
                       ),
@@ -277,10 +328,12 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: CurrentSetup.brand.primary,
-                      padding:
-                          const EdgeInsets.symmetric(vertical: SSpace.md + 3),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: SSpace.md + 3,
+                      ),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(SRadius.pill)),
+                        borderRadius: BorderRadius.circular(SRadius.pill),
+                      ),
                     ),
                     onPressed: () async {
                       final err = await b.fileDispute(
@@ -294,13 +347,16 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                       setState(() {
                         _error = err;
                         if (err == null) {
-                          _note = 'Dispute filed. The bank will come back to '
+                          _note =
+                              'Dispute filed. The bank will come back to '
                               'you about it.';
                         }
                       });
                     },
-                    child: const Text('File it',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: const Text(
+                      'File it',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ],
@@ -330,14 +386,17 @@ class _StatusPill extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(
-          horizontal: SSpace.md, vertical: SSpace.xs + 2),
+        horizontal: SSpace.md,
+        vertical: SSpace.xs + 2,
+      ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(SRadius.pill),
       ),
-      child: Text(label,
-          style: TextStyle(
-              color: fg, fontSize: 12, fontWeight: FontWeight.w700)),
+      child: Text(
+        label,
+        style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w700),
+      ),
     );
   }
 }
@@ -349,24 +408,28 @@ class _Fact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: SSpace.sm),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 104,
-              child: Text(k,
-                  style:
-                      const TextStyle(color: SColors.muted, fontSize: 12.5)),
-            ),
-            Expanded(
-              child: Text(v,
-                  style: TextStyle(
-                      color: danger ? SColors.danger : SColors.ink,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13)),
-            ),
-          ],
+    padding: const EdgeInsets.only(bottom: SSpace.sm),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 104,
+          child: Text(
+            k,
+            style: const TextStyle(color: SColors.muted, fontSize: 12.5),
+          ),
         ),
-      );
+        Expanded(
+          child: Text(
+            v,
+            style: TextStyle(
+              color: danger ? SColors.danger : SColors.ink,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

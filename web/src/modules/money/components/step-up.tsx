@@ -10,9 +10,10 @@ import { Icon } from "./icons";
  * shows. The UI asks; the bank's API is what actually enforces it.
  */
 export function StepUpDialog({
-  action, title, body, confirmLabel = "Confirm", sample, onCancel, onConfirm,
+  action, title, body, initialChallenge, confirmLabel = "Confirm", sample, onCancel, onConfirm,
 }: {
   action: StepUpAction;
+  initialChallenge?: StepUpChallenge;
   title: string;
   body?: string;
   confirmLabel?: string;
@@ -30,11 +31,12 @@ export function StepUpDialog({
 
   const start = useCallback(async () => {
     setErr(null);
+    if (initialChallenge) { setChallenge(initialChallenge); return; }
     setChallenge(null);
     const r = await startStepUpAction(action);
     if (r.ok) { setChallenge(r.data); setWait(30); setTimeout(() => inputs.current[0]?.focus(), 30); }
     else setErr(r.error);
-  }, [action]);
+  }, [action, initialChallenge]);
 
   useEffect(() => { start(); }, [start]);
   useEffect(() => {
@@ -88,7 +90,7 @@ export function StepUpDialog({
         <h2 id="mn-su-t">{title}</h2>
         <p>
           {body ? `${body} ` : ""}
-          {challenge ? <>Enter the 6-digit code we sent to <b style={{ color: "var(--text)" }}>{challenge.destination}</b>.</> : "Sending your code…"}
+          {challenge ? <>{challenge.method === "totp" ? "Enter the 6-digit code from " : "Enter the 6-digit code we sent to "}<b style={{ color: "var(--text)" }}>{challenge.destination}</b>.</> : "Preparing verification…"}
         </p>
         {sample && <div className="mn-otp-hint">Sample mode: no text is sent. Enter any 6 digits.</div>}
         <form onSubmit={(e) => { e.preventDefault(); if (digits.every((d) => d)) submit(digits.join("")); }}>
@@ -110,8 +112,8 @@ export function StepUpDialog({
           </div>
           {err && <div className="mn-formerr" role="alert"><Icon name="alert" size={16} />{err}</div>}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 6 }}>
-            <button type="button" className="mn-resend" disabled={wait > 0 || busy} onClick={start}>
-              {wait > 0 ? `Resend code in ${wait}s` : "Resend code"}
+            <button hidden={challenge?.method === "totp"} type="button" className="mn-resend" disabled={wait > 0 || busy} onClick={start}>
+              {challenge?.method === "totp" ? <span>Use the current code in your authenticator app.</span> : wait > 0 ? `Resend code in ${wait}s` : "Resend code"}
             </button>
             <button type="submit" className="btn clay sm" disabled={busy || !digits.every((d) => d)}>{busy ? "Checking…" : confirmLabel}</button>
           </div>

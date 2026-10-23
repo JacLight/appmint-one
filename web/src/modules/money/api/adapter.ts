@@ -9,7 +9,7 @@ import "server-only";
  *                   goes to the engine unless PORTAL_MONEY_SAMPLE=1.
  * - "live"        — env PORTAL_MONEY_API_URL is set (the bank's API base URL), or
  *                   PORTAL_MONEY_API=engine (the contract served by appengine under
- *                   `client/banking/*`). Calls the contract in
+ *                   `client/banking/*`, mapped by EngineBankingApi). Custom APIs use the contract in
  *                   /Users/imzee/projects/docs/APPMINT-MONEY-API-CONTRACT.md.
  * - "unavailable" — production with no API: the screens say "Not available yet".
  *
@@ -21,6 +21,8 @@ import { apiReq } from "@/lib/api";
 import { getAppmintAuth } from "@/lib/appmint-auth";
 import { runtimeEnv } from "@/lib/runtime-env";
 import { SampleBankingApi } from "./sample";
+import { EngineBankingApi } from "./engine";
+import { customerAuthorization } from "./authorization";
 import {
   BankError, type BankErrorCode, type BankingApi, type CardLimitsInput, type IdentityFileInput, type IdentityInput, type NewMoneyRequest, type NewRecipient,
   type RecipientKind, type StepUpAction, type StepUpMethod, type StepUpProof, type TransactionQuery, type TransferInput, type TransferKind, type TransferStatus,
@@ -33,6 +35,10 @@ export function bankingMode(): BankingMode {
   if (runtimeEnv("PORTAL_MONEY_API_URL") || runtimeEnv("PORTAL_MONEY_API") === "engine") return "live";
   if (process.env.NODE_ENV !== "production") return "sample";
   return "unavailable";
+}
+
+export function usesEngineBanking(): boolean {
+  return bankingMode() === "live" && !runtimeEnv("PORTAL_MONEY_API_URL") && runtimeEnv("PORTAL_MONEY_API") === "engine";
 }
 
 /* ───────────── live transport ───────────── */
@@ -62,9 +68,10 @@ function toBankError(e: unknown): BankError {
 function directTransport(base: string): Transport {
   return async (method, path, body, query) => {
     const { token } = await getAppmintAuth().getClientInfo().catch(() => ({ token: null as string | null }));
+    const authorization = customerAuthorization(token);
     const res = await fetch(`${base.replace(/\/$/, "")}/${path}${qs(query)}`, {
       method,
-      headers: { "content-type": "application/json", accept: "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}), "x-org-id": runtimeEnv("ORG_ID") || "" },
+      headers: { "content-type": "application/json", accept: "application/json", ...(authorization ? { authorization } : {}), "x-org-id": runtimeEnv("ORG_ID") || "" },
       body: body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store",
     });
@@ -75,7 +82,7 @@ function directTransport(base: string): Transport {
   };
 }
 
-/** The same contract served by appengine at `client/banking/*` (customer JWT). */
+/** The engine's own customer endpoints (customer JWT), adapted separately below. */
 const engineTransport: Transport = async (method, path, body, query) => {
   try {
     return await apiReq(method, `client/banking/${path}`, { data: body, query });
@@ -136,7 +143,12 @@ export const getBanking = cache(async (): Promise<{ mode: BankingMode; api: Bank
   if (mode === "unavailable") return { mode, api: null };
   if (mode === "live") {
     const url = runtimeEnv("PORTAL_MONEY_API_URL");
-    return { mode, api: new HttpBankingApi(url ? directTransport(url) : engineTransport) };
+    if (url) return { mode, api: new HttpBankingApi(directTransport(url)) };
+    return { mode, api: new EngineBankingApi(engineTransport, async () => {
+      const rec = await apiReq("GET", "client-data/profile");
+      const d = rec?.data || {};
+      return { customerId: rec.sk, firstName: d.firstName || "", lastName: d.lastName || "", handle: d.username || "", email: d.email, since: rec.createdate || "" };
+    }) };
   }
   const s = await getSession();
   const c = s.customer;

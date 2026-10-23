@@ -298,6 +298,8 @@ class _LoanApplyFormScreenState extends State<LoanApplyFormScreen> {
       if (term == null || term <= 0) 'how many months to repay it over',
       if (purpose.isEmpty) 'what the loan is for',
       if (income == null || income <= 0) 'your monthly income before tax',
+      if (_housing.text.trim().isNotEmpty && housing == null)
+        'a valid monthly housing payment',
       if (linked == null) 'which account the loan should pay into',
     ];
     if (missing.isNotEmpty) {

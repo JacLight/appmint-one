@@ -5,6 +5,7 @@ import '../../../../config/setup.dart';
 import '../../../../config/stowbo_theme.dart';
 import '../../../../providers/banking_provider.dart';
 import '../../../../services/banking_api.dart';
+import '../../../../services/banking_payee.dart';
 import '../../shared/module_states.dart';
 import 'banking_widgets.dart';
 import 'payees_screen.dart';
@@ -19,8 +20,9 @@ enum MoveMode { transfer, pay, pull }
 
 class MoveMoneyScreen extends StatefulWidget {
   final MoveMode mode;
+  final bool embedded;
   final Map<String, dynamic>? from;
-  const MoveMoneyScreen({super.key, required this.mode, this.from});
+  const MoveMoneyScreen({super.key, required this.mode, this.from, this.embedded = false});
 
   @override
   State<MoveMoneyScreen> createState() => _MoveMoneyScreenState();
@@ -38,6 +40,7 @@ class _MoveMoneyScreenState extends State<MoveMoneyScreen> {
   bool _sameDay = false;
   String? _error;
   String? _done;
+  bool _pending = false;
 
   static const _rails = ['ach', 'wire', 'rtp', 'fednow'];
 
@@ -95,11 +98,13 @@ class _MoveMoneyScreenState extends State<MoveMoneyScreen> {
       _done = null;
     });
 
+    String? receiptStatus;
     final err = switch (_mode) {
       MoveMode.transfer => await b.transfer(
           from: _fromId!,
           toAccountNumber: _toNumber.text.trim(),
           amountCents: cents,
+          onReceipt: (status) => receiptStatus = status,
           memo: _memo.text.trim(),
         ),
       MoveMode.pay => await b.pay(
@@ -107,6 +112,7 @@ class _MoveMoneyScreenState extends State<MoveMoneyScreen> {
           counterparty: _payeeId!,
           rail: _rail,
           amountCents: cents,
+          onReceipt: (status) => receiptStatus = status,
           sameDay: _sameDay,
           memo: _memo.text.trim(),
         ),
@@ -114,6 +120,7 @@ class _MoveMoneyScreenState extends State<MoveMoneyScreen> {
           account: _fromId!,
           counterparty: _payeeId!,
           amountCents: cents,
+          onReceipt: (status) => receiptStatus = status,
         ),
     };
 
@@ -124,6 +131,7 @@ class _MoveMoneyScreenState extends State<MoveMoneyScreen> {
     }
     setState(() {
       _done = Money.format(cents, currency: b.currency);
+      _pending = receiptStatus != 'posted';
       _amount.clear();
       _memo.clear();
       _toNumber.clear();
@@ -139,7 +147,13 @@ class _MoveMoneyScreenState extends State<MoveMoneyScreen> {
     final tooMuch =
         cents != null && spendable != null && cents > spendable;
 
-    if (_done != null) return _Sent(amount: _done!, mode: _mode);
+    if (_done != null) return _Sent(amount: _done!, mode: _mode, pending: _pending, onDone: () {
+      if (widget.embedded) {
+        setState(() => _done = null);
+      } else {
+        Navigator.of(context).pop();
+      }
+    });
 
     return Scaffold(
       backgroundColor: SColors.paper,
@@ -286,8 +300,7 @@ class _MoveMoneyScreenState extends State<MoveMoneyScreen> {
                   title: '${p['holderName'] ?? p['name'] ?? 'Payee'}',
                   subtitle: [
                     if ('${p['bankName'] ?? ''}'.isNotEmpty) '${p['bankName']}',
-                    if ('${p['accountNumber'] ?? ''}'.isNotEmpty)
-                      '${p['accountNumber']}',
+                    if (payeeAccountLabel(p).isNotEmpty) payeeAccountLabel(p),
                   ].join(' · '),
                   selected: _payeeId == BankingProvider.idOf(p),
                   onTap: () =>
@@ -407,7 +420,9 @@ class _Label extends StatelessWidget {
 class _Sent extends StatelessWidget {
   final String amount;
   final MoveMode mode;
-  const _Sent({required this.amount, required this.mode});
+  final bool pending;
+  final VoidCallback onDone;
+  const _Sent({required this.amount, required this.mode, required this.pending, required this.onDone});
 
   @override
   Widget build(BuildContext context) {
@@ -424,10 +439,10 @@ class _Sent extends StatelessWidget {
               Container(
                 width: 74,
                 height: 74,
-                decoration: const BoxDecoration(
-                    color: SColors.greenSoft, shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded,
-                    size: 36, color: SColors.green),
+                decoration: BoxDecoration(
+                    color: pending ? SColors.paper2 : SColors.greenSoft, shape: BoxShape.circle),
+                child: Icon(pending ? Icons.hourglass_top_rounded : Icons.check_rounded,
+                    size: 36, color: pending ? SColors.muted : SColors.green),
               ),
               const SizedBox(height: SSpace.xl),
               Text(amount,
@@ -439,7 +454,7 @@ class _Sent extends StatelessWidget {
                   )),
               const SizedBox(height: SSpace.sm),
               Text(
-                switch (mode) {
+                pending ? 'Request received — awaiting bank processing. Money movement is not confirmed yet.' : switch (mode) {
                   MoveMode.transfer => 'Transferred. It shows on both '
                       'accounts straight away.',
                   MoveMode.pay => 'Sent. It will show as pending until it '
@@ -460,7 +475,7 @@ class _Sent extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(SRadius.pill)),
                 ),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: onDone,
                 child: const Text('Done',
                     style: TextStyle(fontWeight: FontWeight.w700)),
               ),

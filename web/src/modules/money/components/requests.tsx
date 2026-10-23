@@ -79,7 +79,7 @@ export function RequestForm({ accounts, bank }: { accounts: Account[]; bank: str
       )}
       <div className={`mn-field${err?.field === "amount" ? " invalid" : ""}`}>
         <label htmlFor="rq-amt">Amount</label>
-        <div className="mn-amount"><span>$</span><input id="rq-amt" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} inputMode="decimal" placeholder="0.00" /></div>
+        <div className="mn-amount"><span>$</span><input id="rq-amt" value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0.00" /></div>
       </div>
       <div className="mn-field">
         <label htmlFor="rq-memo">What’s it for?</label>

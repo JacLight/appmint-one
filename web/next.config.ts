@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["*.localhost"],
   // Pin the workspace root to this project so Turbopack doesn't walk up to $HOME.
   turbopack: {
-    root: path.resolve(__dirname),
+    root: path.resolve(process.cwd()),
   },
   images: {
     remotePatterns: [

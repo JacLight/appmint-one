@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../config/setup.dart';
 import '../../../../config/stowbo_theme.dart';
 import '../../../../providers/banking_provider.dart';
+import '../../../../services/banking_payee.dart';
 import '../../shared/module_states.dart';
 
 /// Who I can send money to, and bring it in from.
@@ -24,19 +25,28 @@ class PayeesScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: SColors.paper,
         surfaceTintColor: Colors.transparent,
-        title: const Text('Payees',
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w700, color: SColors.ink)),
+        title: const Text(
+          'Payees',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: SColors.ink,
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: brand.primary,
         foregroundColor: Colors.white,
         onPressed: () => _add(context),
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Add payee',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        label: const Text(
+          'Add payee',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
       ),
-      body: b.payees.isEmpty
+      body: b.sectionError('payees') != null
+          ? ModuleError(message: b.sectionError('payees')!, onRetry: b.load)
+          : b.payees.isEmpty
           ? const Padding(
               padding: EdgeInsets.all(SSpace.lg),
               child: ModuleEmpty(
@@ -44,12 +54,16 @@ class PayeesScreen extends StatelessWidget {
                 title: 'No payees',
                 body:
                     'Add an account at another bank, confirm the two small '
-                    'deposits we send it, and you can pay it or pull from it.',
+                    'deposits after the bank processes them, and you can pay it or pull from it.',
               ),
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(
-                  SSpace.lg, SSpace.lg, SSpace.lg, SSpace.xxl * 2),
+                SSpace.lg,
+                SSpace.lg,
+                SSpace.lg,
+                SSpace.xxl * 2,
+              ),
               children: [
                 for (final p in b.payees)
                   Padding(
@@ -89,32 +103,37 @@ class PayeesScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Add a payee',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: SColors.ink,
-                      fontFamily: CurrentSetup.brand.displayFont,
-                    )),
+                Text(
+                  'Add a payee',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: SColors.ink,
+                    fontFamily: CurrentSetup.brand.displayFont,
+                  ),
+                ),
                 const SizedBox(height: SSpace.lg),
                 TextField(
                   controller: name,
                   decoration: const InputDecoration(
-                      labelText: 'Name on the account'),
+                    labelText: 'Name on the account',
+                  ),
                 ),
                 const SizedBox(height: SSpace.md),
                 TextField(
                   controller: routing,
                   keyboardType: TextInputType.number,
-                  decoration:
-                      const InputDecoration(labelText: 'Routing number'),
+                  decoration: const InputDecoration(
+                    labelText: 'Routing number',
+                  ),
                 ),
                 const SizedBox(height: SSpace.md),
                 TextField(
                   controller: number,
                   keyboardType: TextInputType.number,
-                  decoration:
-                      const InputDecoration(labelText: 'Account number'),
+                  decoration: const InputDecoration(
+                    labelText: 'Account number',
+                  ),
                 ),
                 const SizedBox(height: SSpace.md),
                 Row(
@@ -125,8 +144,7 @@ class PayeesScreen extends StatelessWidget {
                         child: ChoiceChip(
                           label: Text(t),
                           selected: accountType == t,
-                          onSelected: (_) =>
-                              setSheet(() => accountType = t),
+                          onSelected: (_) => setSheet(() => accountType = t),
                           selectedColor: CurrentSetup.brand.primary,
                           labelStyle: TextStyle(
                             color: accountType == t
@@ -163,10 +181,12 @@ class PayeesScreen extends StatelessWidget {
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: CurrentSetup.brand.primary,
-                      padding:
-                          const EdgeInsets.symmetric(vertical: SSpace.md + 3),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: SSpace.md + 3,
+                      ),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(SRadius.pill)),
+                        borderRadius: BorderRadius.circular(SRadius.pill),
+                      ),
                     ),
                     onPressed: () async {
                       final err = await b.addPayee({
@@ -179,13 +199,18 @@ class PayeesScreen extends StatelessWidget {
                       if (!sheet.mounted) return;
                       Navigator.of(sheet).pop();
                       if (err != null && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
                             backgroundColor: SColors.danger,
-                            content: Text(err)));
+                            content: Text(err),
+                          ),
+                        );
                       }
                     },
-                    child: const Text('Add',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: const Text(
+                      'Add',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ],
@@ -205,8 +230,8 @@ class _PayeeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final b = context.read<BankingProvider>();
     final id = BankingProvider.idOf(payee);
-    final status = '${payee['status'] ?? ''}'.toLowerCase();
-    final verified = status == 'verified' || payee['verified'] == true;
+    final status = payeeVerificationStatus(payee);
+    final verified = payeeIsVerified(payee);
     final awaiting = status.contains('micro') || status == 'pending';
 
     return Container(
@@ -225,30 +250,37 @@ class _PayeeRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${payee['holderName'] ?? payee['name'] ?? 'Payee'}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: SColors.ink)),
+                    Text(
+                      '${payee['holderName'] ?? payee['name'] ?? 'Payee'}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: SColors.ink,
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Text(
                       [
                         if ('${payee['bankName'] ?? ''}'.isNotEmpty)
                           '${payee['bankName']}',
-                        if ('${payee['accountNumber'] ?? ''}'.isNotEmpty)
-                          '${payee['accountNumber']}',
+                        if (payeeAccountLabel(payee).isNotEmpty)
+                          payeeAccountLabel(payee),
                         if ('${payee['accountType'] ?? ''}'.isNotEmpty)
                           '${payee['accountType']}',
                       ].join(' · '),
-                      style:
-                          const TextStyle(color: SColors.muted, fontSize: 11.5),
+                      style: const TextStyle(
+                        color: SColors.muted,
+                        fontSize: 11.5,
+                      ),
                     ),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: SSpace.sm + 2, vertical: 4),
+                  horizontal: SSpace.sm + 2,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: verified ? SColors.greenSoft : const Color(0xFFFDF1DC),
                   borderRadius: BorderRadius.circular(SRadius.pill),
@@ -264,35 +296,54 @@ class _PayeeRow extends StatelessWidget {
               ),
             ],
           ),
-          if (!verified) ...[
+          ...[
             const SizedBox(height: SSpace.md),
             Row(
               children: [
-                if (!awaiting)
+                if (!verified && !awaiting)
                   TextButton(
                     onPressed: () async {
                       final err = await b.startMicroDeposits(id);
                       if (err != null && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
                             backgroundColor: SColors.danger,
-                            content: Text(err)));
+                            content: Text(err),
+                          ),
+                        );
                       }
                     },
-                    child: const Text('Send two deposits',
-                        style: TextStyle(fontSize: 12.5)),
+                    child: const Text(
+                      'Request verification',
+                      style: TextStyle(fontSize: 12.5),
+                    ),
                   )
-                else
+                else if (!verified)
                   TextButton(
                     onPressed: () => _confirm(context, id),
-                    child: const Text('Confirm the amounts',
-                        style: TextStyle(fontSize: 12.5)),
+                    child: const Text(
+                      'Confirm the amounts',
+                      style: TextStyle(fontSize: 12.5),
+                    ),
                   ),
                 const Spacer(),
                 TextButton(
-                  onPressed: () => b.removePayee(id),
-                  child: const Text('Remove',
-                      style:
-                          TextStyle(color: SColors.danger, fontSize: 12.5)),
+                  onPressed: b.busy
+                      ? null
+                      : () async {
+                          final error = await b.removePayee(id);
+                          if (error != null && context.mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(error),
+                                backgroundColor: SColors.danger,
+                              ),
+                            );
+                        },
+                  child: const Text(
+                    'Remove',
+                    style: TextStyle(color: SColors.danger, fontSize: 12.5),
+                  ),
                 ),
               ],
             ),
@@ -349,7 +400,8 @@ class _PayeeRow extends StatelessWidget {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-                backgroundColor: CurrentSetup.brand.primary),
+              backgroundColor: CurrentSetup.brand.primary,
+            ),
             onPressed: () async {
               final a = int.tryParse(first.text.trim());
               final c = int.tryParse(second.text.trim());
@@ -358,8 +410,9 @@ class _PayeeRow extends StatelessWidget {
               if (!dialog.mounted) return;
               Navigator.of(dialog).pop();
               if (err != null && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    backgroundColor: SColors.danger, content: Text(err)));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(backgroundColor: SColors.danger, content: Text(err)),
+                );
               }
             },
             child: const Text('Confirm'),

@@ -10,15 +10,16 @@ const KIND_TITLE: Record<TransferOptions["kind"], string> = {
 
 /** Limits, speeds and fees for this way of sending — all as the bank reports them. */
 export function SendAside({ options }: { options: TransferOptions }) {
-  const used = options.dailyLimit.amount ? Math.min(100, Math.round((options.sentToday.amount / options.dailyLimit.amount) * 100)) : 0;
+  const hasDailyFigures = !!(options.dailyLimit && options.sentToday && options.remainingToday);
+  const used = options.dailyLimit?.amount && options.sentToday ? Math.min(100, Math.round((options.sentToday.amount / options.dailyLimit.amount) * 100)) : 0;
   return (
     <aside className="mn-side mn-sendside">
-      <section className="mn-panel">
+      {hasDailyFigures && <section className="mn-panel">
         <div className="mn-panel-hd"><span>Left to send today</span></div>
         <div className="mn-limit-big">{fmt(options.remainingToday)}</div>
         <div className="mn-meter" aria-hidden><i style={{ width: `${Math.max(used, 1)}%` }} /></div>
         <p className="mn-muted mn-small">{fmt(options.sentToday)} sent of your {fmt(options.dailyLimit)} daily limit</p>
-      </section>
+      </section>}
       <section className="mn-panel">
         <div className="mn-panel-hd"><span>{KIND_TITLE[options.kind]}</span></div>
         <ul className="mn-speeds">

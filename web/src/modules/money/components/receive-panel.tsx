@@ -18,7 +18,7 @@ function useCopy() {
 
 /** Account + routing numbers, masked until the customer confirms it's them. */
 export function ReceivePanel({ details, sample }: { details: ReceiveDetails; sample: boolean }) {
-  const [full, setFull] = useState<string | null>(null);
+  const [full, setFull] = useState<string | null>(details.revealRequiresVerification === false ? details.accountNumber || null : null);
   const [show, setShow] = useState(false);
   const [stepUp, setStepUp] = useState(false);
   const [pending, setPending] = useState<null | "show" | "copy" | "share">(null);
@@ -26,7 +26,7 @@ export function ReceivePanel({ details, sample }: { details: ReceiveDetails; sam
   const [shared, setShared] = useState<string | null>(null);
 
   const text = (acct: string) =>
-    `${details.accountHolder}\n${details.bankName} — ${details.accountType === "savings" ? "Savings" : "Checking"}\nRouting number: ${details.routingNumber}\nAccount number: ${acct}\n${details.bankAddress}`;
+    `${details.accountHolder}\n${details.bankName} — ${details.accountType === "savings" ? "Savings" : "Checking"}\nRouting number: ${details.routingNumber}\nAccount number: ${acct}\n${details.bankAddress || ""}`;
 
   const share = async (acct: string) => {
     const body = text(acct);
@@ -53,7 +53,7 @@ export function ReceivePanel({ details, sample }: { details: ReceiveDetails; sam
   return (
     <>
       <section className="mn-panel">
-        <div className="mn-panel-hd"><span>{details.bankName} {details.accountType === "savings" ? "Savings" : "Checking"} ••{details.accountMask}</span><span className="mn-chip s-active">For direct deposit &amp; transfers</span></div>
+        <div className="mn-panel-hd"><span>{details.bankName} {details.accountType === "savings" ? "Savings" : "Checking"} ••{details.accountMask}</span><span className="mn-chip s-active">Receiving account details</span></div>
         <div className="mn-detail">
           <div><span>Account holder</span><b>{details.accountHolder}</b></div>
         </div>
@@ -76,10 +76,10 @@ export function ReceivePanel({ details, sample }: { details: ReceiveDetails; sam
         <div className="mn-detail">
           <div><span>Account type</span><b style={{ fontSize: 16 }}>{details.accountType === "savings" ? "Savings" : "Checking"}</b></div>
         </div>
-        <div className="mn-detail">
+        {details.bankAddress && <div className="mn-detail">
           <div><span>Bank address</span><b style={{ fontSize: 15, fontFamily: "var(--font-body)", fontWeight: 500, letterSpacing: 0, whiteSpace: "normal" }}>{details.bankName}, {details.bankAddress}</b></div>
-        </div>
-        <p className="mn-secure" style={{ justifyContent: "flex-start" }}><Icon name="lock" size={14} />Your full account number shows only after you confirm it’s you.</p>
+        </div>}
+        <p className="mn-secure" style={{ justifyContent: "flex-start" }}><Icon name="lock" size={14} />{details.revealRequiresVerification === false ? "Keep your account details private. Show and copy them only when needed." : "Your full account number shows only after you confirm it’s you."}</p>
       </section>
 
       <aside className="mn-side">
@@ -94,11 +94,11 @@ export function ReceivePanel({ details, sample }: { details: ReceiveDetails; sam
         </section>
         <section className="mn-panel">
           <div className="mn-panel-hd"><span>When money arrives</span></div>
-          <ul className="mn-bullets">
+          {details.notes?.length ? <ul className="mn-bullets">{details.notes.map(note => <li key={note}><span>{note}</span></li>)}</ul> : <ul className="mn-bullets">
             <li><b>From someone at {details.bankName}</b><span>Instantly, any day.</span></li>
             <li><b>Bank transfers (ACH)</b><span>Usually 1–2 business days after they send.</span></li>
             <li><b>Direct deposit</b><span>On payday, as soon as your employer’s file arrives.</span></li>
-          </ul>
+          </ul>}
         </section>
       </aside>
 

@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import { getSetup } from "@/lib/setup";
-import { bankingMode, load } from "@/modules/money/api/adapter";
+import { bankingMode, usesEngineBanking, load } from "@/modules/money/api/adapter";
 import { BankHead, ErrorPanel } from "@/modules/money/components/bits";
+import { BankRequestsPanel } from "@/modules/money/components/bank-domain-panels";
 import { RequestForm, RequestLists } from "@/modules/money/components/requests";
 
 export const metadata: Metadata = { title: "Request money" };
 
 export default async function RequestPage() {
   const setup = await getSetup();
+  if (usesEngineBanking()) {
+    const accounts = await load(b => b.listAccounts());
+    return <><BankHead title="Same-bank money requests" sub="Create or review full-amount USD requests. No message is sent automatically." />{accounts.ok ? <BankRequestsPanel accounts={accounts.data.items} /> : <ErrorPanel error={accounts.error} />}</>;
+  }
   const [accounts, incoming, outgoing] = await Promise.all([
     load((b) => b.listAccounts()),
     load((b) => b.listRequests("incoming")),

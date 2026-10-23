@@ -12,7 +12,8 @@ class AppengineHttpClient {
   AppengineHttpClient._internal() : _transport = http.Client();
 
   @visibleForTesting
-  AppengineHttpClient.forTesting(http.Client transport) : _transport = transport;
+  AppengineHttpClient.forTesting(http.Client transport)
+    : _transport = transport;
 
   final http.Client _transport;
 
@@ -45,8 +46,8 @@ class AppengineHttpClient {
 
   /// Fetch (or reuse an in-flight fetch of) the app token. Retries transient
   /// network failures with backoff so a brief outage self-heals.
-  Future<String?> getAppToken() =>
-      _pendingToken ??= _fetchAppToken().whenComplete(() => _pendingToken = null);
+  Future<String?> getAppToken() => _pendingToken ??= _fetchAppToken()
+      .whenComplete(() => _pendingToken = null);
 
   Future<String?> _fetchAppToken() async {
     const maxAttempts = 4;
@@ -54,16 +55,18 @@ class AppengineHttpClient {
       try {
         final uri = Uri.parse('$baseUrl/profile/app/key');
         final res = await _transport
-            .post(uri,
-                headers: {
-                  'Content-Type': 'application/json',
-                  'orgid': EnvironmentConfig.orgId,
-                },
-                body: jsonEncode({
-                  'appId': EnvironmentConfig.appId,
-                  'secret': EnvironmentConfig.appSecret,
-                  'key': EnvironmentConfig.appKey,
-                }))
+            .post(
+              uri,
+              headers: {
+                'Content-Type': 'application/json',
+                'orgid': EnvironmentConfig.orgId,
+              },
+              body: jsonEncode({
+                'appId': EnvironmentConfig.appId,
+                'secret': EnvironmentConfig.appSecret,
+                'key': EnvironmentConfig.appKey,
+              }),
+            )
             .timeout(const Duration(seconds: 30));
         if (res.statusCode >= 200 && res.statusCode < 300) {
           final body = jsonDecode(res.body);
@@ -82,8 +85,10 @@ class AppengineHttpClient {
         if (_isTransient(e) && attempt < maxAttempts) {
           final backoff = Duration(milliseconds: 400 * attempt);
           if (kDebugMode) {
-            print('⏳ App token attempt $attempt failed (${_short(e)}); '
-                'retrying in ${backoff.inMilliseconds}ms');
+            print(
+              '⏳ App token attempt $attempt failed (${_short(e)}); '
+              'retrying in ${backoff.inMilliseconds}ms',
+            );
           }
           await Future.delayed(backoff);
           continue;
@@ -135,14 +140,16 @@ class AppengineHttpClient {
           ? (e['message'] as List).join(', ')
           : (e['message'] ?? e['error'] ?? e['msg']) as String?;
     } catch (_) {}
-    throw Exception(msg ??
-        (res.statusCode == 401
-            ? 'Please sign in again'
-            : res.statusCode == 404
-                ? 'Not found'
-                : res.statusCode >= 500
-                    ? 'Server error — try again'
-                    : 'Request failed (${res.statusCode})'));
+    throw Exception(
+      msg ??
+          (res.statusCode == 401
+              ? 'Please sign in again'
+              : res.statusCode == 404
+              ? 'Not found'
+              : res.statusCode >= 500
+              ? 'Server error — try again'
+              : 'Request failed (${res.statusCode})'),
+    );
   }
 
   Future<dynamic> request(
@@ -151,7 +158,13 @@ class AppengineHttpClient {
     Map<String, dynamic>? body,
     Map<String, String>? queryParams,
     bool useUserToken = true,
-  }) => _request(method, path, body: body, queryParams: queryParams, useUserToken: useUserToken);
+  }) => _request(
+    method,
+    path,
+    body: body,
+    queryParams: queryParams,
+    useUserToken: useUserToken,
+  );
 
   Future<dynamic> _request(
     String method,
@@ -160,6 +173,7 @@ class AppengineHttpClient {
     Map<String, String>? queryParams,
     bool useUserToken = true,
     bool retryAuth = true,
+    bool responseBytes = false,
   }) async {
     try {
       if (_appToken == null) await getAppToken();
@@ -176,8 +190,9 @@ class AppengineHttpClient {
               '_ts': DateTime.now().microsecondsSinceEpoch.toString(),
             }
           : queryParams;
-      final uri = Uri.parse('$baseUrl$path')
-          .replace(queryParameters: effectiveParams);
+      final uri = Uri.parse(
+        '$baseUrl$path',
+      ).replace(queryParameters: effectiveParams);
       final encoded = body != null ? jsonEncode(body) : null;
 
       // Retry the send on transient network errors (connection refused/reset,
@@ -199,8 +214,10 @@ class AppengineHttpClient {
           if (_isTransient(e) && attempt < maxAttempts) {
             final backoff = Duration(milliseconds: 400 * attempt);
             if (kDebugMode) {
-              print('⏳ $method $path attempt $attempt failed '
-                  '(${_short(e)}); retrying in ${backoff.inMilliseconds}ms');
+              print(
+                '⏳ $method $path attempt $attempt failed '
+                '(${_short(e)}); retrying in ${backoff.inMilliseconds}ms',
+              );
             }
             await Future.delayed(backoff);
             continue;
@@ -213,21 +230,34 @@ class AppengineHttpClient {
         // Customer and app credentials expire independently. Refresh the
         // customer's session once, shared by concurrent operator requests.
         // Anonymous/refresh calls must never recursively refresh the user.
-        if (sentUserToken != null && _userToken == sentUserToken && refreshUserToken != null) {
-          await (_pendingUserRefresh ??= Future.sync(refreshUserToken!)
-              .whenComplete(() => _pendingUserRefresh = null));
+        if (sentUserToken != null &&
+            _userToken == sentUserToken &&
+            refreshUserToken != null) {
+          await (_pendingUserRefresh ??= Future.sync(
+            refreshUserToken!,
+          ).whenComplete(() => _pendingUserRefresh = null));
         }
         if (sentUserToken != null && !hasUserToken) return _handle(res);
-        final userRenewed = sentUserToken != null && _userToken != sentUserToken;
+        final userRenewed =
+            sentUserToken != null && _userToken != sentUserToken;
         if (!userRenewed && _appToken == sentAppToken) {
           _appToken = null;
           await getAppToken();
         }
         if (_appToken != null) {
-          return await _request(method, path, body: body, queryParams: queryParams,
-              useUserToken: useUserToken, retryAuth: false);
+          return await _request(
+            method,
+            path,
+            body: body,
+            queryParams: queryParams,
+            useUserToken: useUserToken,
+            retryAuth: false,
+            responseBytes: responseBytes,
+          );
         }
       }
+      if (responseBytes && res.statusCode >= 200 && res.statusCode < 300)
+        return res.bodyBytes;
       return _handle(res);
     } catch (e) {
       if (e is Exception) rethrow;
@@ -235,8 +265,12 @@ class AppengineHttpClient {
     }
   }
 
-  Future<http.Response> _send(String method, Uri uri,
-      Map<String, String> headers, String? encoded) {
+  Future<http.Response> _send(
+    String method,
+    Uri uri,
+    Map<String, String> headers,
+    String? encoded,
+  ) {
     const t = Duration(seconds: 30);
     switch (method.toUpperCase()) {
       case 'GET':
@@ -244,7 +278,9 @@ class AppengineHttpClient {
       case 'POST':
         return _transport.post(uri, headers: headers, body: encoded).timeout(t);
       case 'PATCH':
-        return _transport.patch(uri, headers: headers, body: encoded).timeout(t);
+        return _transport
+            .patch(uri, headers: headers, body: encoded)
+            .timeout(t);
       case 'PUT':
         return _transport.put(uri, headers: headers, body: encoded).timeout(t);
       case 'DELETE':
@@ -254,20 +290,36 @@ class AppengineHttpClient {
     }
   }
 
-  Future<dynamic> get(String p,
-          {Map<String, String>? queryParams, bool useUserToken = true}) =>
-      request('GET', p, queryParams: queryParams, useUserToken: useUserToken);
-  Future<dynamic> post(String p,
-          {Map<String, dynamic>? body, bool useUserToken = true}) =>
-      request('POST', p, body: body, useUserToken: useUserToken);
-  Future<dynamic> patch(String p,
-          {Map<String, dynamic>? body, bool useUserToken = true}) =>
-      request('PATCH', p, body: body, useUserToken: useUserToken);
-  Future<dynamic> put(String p,
-          {Map<String, dynamic>? body, bool useUserToken = true}) =>
-      request('PUT', p, body: body, useUserToken: useUserToken);
+  Future<dynamic> get(
+    String p, {
+    Map<String, String>? queryParams,
+    bool useUserToken = true,
+  }) => request('GET', p, queryParams: queryParams, useUserToken: useUserToken);
+  Future<dynamic> post(
+    String p, {
+    Map<String, dynamic>? body,
+    bool useUserToken = true,
+  }) => request('POST', p, body: body, useUserToken: useUserToken);
+  Future<dynamic> patch(
+    String p, {
+    Map<String, dynamic>? body,
+    bool useUserToken = true,
+  }) => request('PATCH', p, body: body, useUserToken: useUserToken);
+  Future<dynamic> put(
+    String p, {
+    Map<String, dynamic>? body,
+    bool useUserToken = true,
+  }) => request('PUT', p, body: body, useUserToken: useUserToken);
   Future<dynamic> delete(String p, {bool useUserToken = true}) =>
       request('DELETE', p, useUserToken: useUserToken);
+
+  /// Authenticated binary GET using the same token refresh/retry path as JSON.
+  Future<Uint8List> getBytes(
+    String path, {
+    Map<String, String>? queryParams,
+  }) async =>
+      await _request('GET', path, queryParams: queryParams, responseBytes: true)
+          as Uint8List;
 
   /// Multipart upload (field name `file`). Returns the saved-file response.
   Future<Map<String, dynamic>> uploadMultipart(
@@ -287,8 +339,9 @@ class AppengineHttpClient {
       if (hasUserToken) 'x-client-authorization': 'Bearer $_userToken',
     });
     if (fields != null) req.fields.addAll(fields);
-    req.files.add(http.MultipartFile.fromBytes('file', bytes,
-        filename: fileName));
+    req.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: fileName),
+    );
     final streamed = await req.send().timeout(const Duration(seconds: 60));
     final res = await http.Response.fromStream(streamed);
     final body = _handle(res);

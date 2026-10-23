@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../config/stowbo_theme.dart';
 import '../../../../providers/banking_provider.dart';
 import '../../../../services/banking_api.dart';
+import '../../../../services/file_service.dart';
 import '../../shared/module_states.dart';
 import 'banking_widgets.dart';
 import 'loan_detail_screen.dart';
@@ -44,9 +46,9 @@ class _LoanApplicationScreenState extends State<LoanApplicationScreen> {
       _error = null;
     });
     try {
-      final a = await context
-          .read<BankingProvider>()
-          .loanApplication(widget.applicationId);
+      final a = await context.read<BankingProvider>().loanApplication(
+        widget.applicationId,
+      );
       if (!mounted) return;
       setState(() {
         _application = a;
@@ -65,8 +67,10 @@ class _LoanApplicationScreenState extends State<LoanApplicationScreen> {
 
   Future<void> _answer(bool accept) async {
     final b = context.read<BankingProvider>();
-    final failure =
-        await b.answerCounteroffer(widget.applicationId, accept: accept);
+    final failure = await b.answerCounteroffer(
+      widget.applicationId,
+      accept: accept,
+    );
     if (!mounted) return;
     if (failure != null) {
       setState(() => _error = failure);
@@ -84,14 +88,263 @@ class _LoanApplicationScreenState extends State<LoanApplicationScreen> {
     if (reason == null || !mounted) return;
 
     final b = context.read<BankingProvider>();
-    final failure =
-        await b.withdrawApplication(widget.applicationId, reason: reason);
+    final failure = await b.withdrawApplication(
+      widget.applicationId,
+      reason: reason,
+    );
     if (!mounted) return;
     if (failure != null) {
       setState(() => _error = failure);
       return;
     }
     await _load();
+  }
+
+  Future<void> _attachEvidence({int? conditionIndex}) async {
+    final bank = context.read<BankingProvider>();
+    final session = bank.sessionGeneration;
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 2400,
+      );
+      if (file == null || !mounted || bank.sessionGeneration != session) return;
+      final bytes = await file.readAsBytes();
+      if (bytes.length > 10 * 1024 * 1024)
+        throw StateError('Choose a photo under 10 MB.');
+      final location = 'banking/loan-applications/${widget.applicationId}';
+      final name =
+          '${DateTime.now().microsecondsSinceEpoch}-${file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')}';
+      if (bank.sessionGeneration != session) return;
+      final uploaded = await fileService.upload(
+        bytes,
+        name,
+        location: location,
+      );
+      if (uploaded == null || uploaded.isEmpty)
+        throw StateError('The file did not upload.');
+      if (!mounted) return;
+      if (bank.sessionGeneration != session)
+        throw StateError('Sign-in changed. The document was not attached.');
+      final path = '$location/$name';
+      final failure = conditionIndex == null
+          ? await bank.attachLoanDocument(widget.applicationId, path)
+          : await bank.respondToLoanCondition(
+              widget.applicationId,
+              conditionIndex,
+              documents: [
+                {'path': path},
+              ],
+            );
+      if (!mounted) return;
+      if (failure != null) {
+        setState(() => _error = failure);
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Evidence submitted for the bank to review.'),
+        ),
+      );
+      await _load();
+    } catch (error) {
+      if (mounted)
+        setState(
+          () => _error = error.toString().replaceFirst('Exception: ', ''),
+        );
+    }
+  }
+
+  Future<void> _respond(Map condition) async {
+    var text = '';
+    final response = await showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text('${condition['text'] ?? 'Condition'}'),
+        content: TextFormField(
+          initialValue: text,
+          onChanged: (value) => text = value,
+          maxLines: 4,
+          maxLength: 2000,
+          decoration: const InputDecoration(labelText: 'Response for the bank'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, text.trim()),
+            child: const Text('Submit response'),
+          ),
+        ],
+      ),
+    );
+    if (response == null || !mounted) return;
+    final index = condition['index'];
+    if (index is! int) return;
+    if (response.isNotEmpty) {
+      final failure = await context
+          .read<BankingProvider>()
+          .respondToLoanCondition(widget.applicationId, index, text: response);
+      if (!mounted) return;
+      if (failure != null) {
+        setState(() => _error = failure);
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Response submitted for review. The bank still needs to clear the condition.',
+          ),
+        ),
+      );
+      await _load();
+    } else {
+      await _attachEvidence(conditionIndex: index);
+    }
+  }
+
+  Future<void> _editDetails() async {
+    final a = _application;
+    final request = a['request'] is Map ? a['request'] as Map : const {};
+    final mine = a['mine'] is Map ? a['mine'] as Map : const {};
+    final income = mine['income'] is Map ? mine['income'] as Map : const {};
+    String dollars(dynamic value) =>
+        value is num ? (value / 100).toStringAsFixed(2) : '';
+    var amount = dollars(request['amount']);
+    var term = '${request['termMonths'] ?? ''}';
+    var purpose = '${request['purpose'] ?? ''}';
+    var gross = dollars(income['grossMonthly']);
+    var housing = dollars(mine['housingPayment']);
+    String? failure;
+    var saving = false;
+    await showDialog<void>(
+      context: context,
+      builder: (dialog) => StatefulBuilder(
+        builder: (dialog, update) => AlertDialog(
+          title: const Text('Correct my application'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  initialValue: amount,
+                  onChanged: (value) => amount = value,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Requested amount',
+                  ),
+                ),
+                TextFormField(
+                  initialValue: term,
+                  onChanged: (value) => term = value,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Term in months',
+                  ),
+                ),
+                TextFormField(
+                  initialValue: purpose,
+                  onChanged: (value) => purpose = value,
+                  decoration: const InputDecoration(labelText: 'Purpose'),
+                ),
+                TextFormField(
+                  initialValue: gross,
+                  onChanged: (value) => gross = value,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Gross monthly income',
+                  ),
+                ),
+                TextFormField(
+                  initialValue: housing,
+                  onChanged: (value) => housing = value,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Monthly housing payment (optional)',
+                  ),
+                ),
+                if (failure != null)
+                  Text(failure!, style: const TextStyle(color: SColors.danger)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(dialog),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final cents = Money.parse(amount);
+                      final months = int.tryParse(term);
+                      final salary = Money.parse(gross);
+                      final rent = Money.parse(housing);
+                      if (cents == null ||
+                          cents <= 0 ||
+                          months == null ||
+                          months <= 0 ||
+                          salary == null ||
+                          salary <= 0 ||
+                          (housing.trim().isNotEmpty && rent == null)) {
+                        update(
+                          () => failure =
+                              'Enter valid amounts and a whole number of months.',
+                        );
+                        return;
+                      }
+                      final patch = <String, dynamic>{};
+                      if (cents != request['amount']) patch['amount'] = cents;
+                      if (months != request['termMonths'])
+                        patch['termMonths'] = months;
+                      if (purpose.trim() != request['purpose'])
+                        patch['purpose'] = purpose.trim();
+                      if (salary != income['grossMonthly'])
+                        patch['income'] = {
+                          'grossMonthly': salary,
+                          if (income['source'] != null)
+                            'source': income['source'],
+                        };
+                      if (rent != null && rent != mine['housingPayment'])
+                        patch['housingPayment'] = rent;
+                      if (patch.isEmpty) {
+                        Navigator.pop(dialog);
+                        return;
+                      }
+                      update(() {
+                        saving = true;
+                        failure = null;
+                      });
+                      final error = await context
+                          .read<BankingProvider>()
+                          .updateLoanApplication(widget.applicationId, patch);
+                      if (!dialog.mounted) return;
+                      if (error != null) {
+                        update(() {
+                          saving = false;
+                          failure = error;
+                        });
+                        return;
+                      }
+                      Navigator.pop(dialog);
+                      await _load();
+                    },
+              child: const Text('Save corrections'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -103,8 +356,7 @@ class _LoanApplicationScreenState extends State<LoanApplicationScreen> {
     final actions = a['actions'];
     final canWithdraw = actions is Map && actions['withdraw'] == true;
     final counteroffer = a['counteroffer'];
-    final needsAnswer =
-        actions is Map && actions['answerCounteroffer'] == true;
+    final needsAnswer = actions is Map && actions['answerCounteroffer'] == true;
     final product = a['product'];
     final loanId = '${a['loan'] ?? ''}'.trim();
 
@@ -113,127 +365,185 @@ class _LoanApplicationScreenState extends State<LoanApplicationScreen> {
       appBar: AppBar(
         backgroundColor: SColors.paper,
         surfaceTintColor: Colors.transparent,
-        title: Text(product is Map
-            ? '${product['title'] ?? 'Application'}'
-            : 'Application'),
+        title: Text(
+          product is Map
+              ? '${product['title'] ?? 'Application'}'
+              : 'Application',
+        ),
       ),
       body: _loading
           ? const ModuleLoading()
           : _error != null && a.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(SSpace.lg),
-                  child: ModuleError(message: _error!, onRetry: _load),
-                )
-              : RefreshIndicator(
-                  color: Theme.of(context).colorScheme.primary,
-                  onRefresh: _load,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(
-                        SSpace.lg, SSpace.lg, SSpace.lg, SSpace.xxl),
-                    children: [
-                      if ('${a['number'] ?? ''}'.isNotEmpty)
-                        Text('${a['number']}',
-                            style: const TextStyle(
-                                fontSize: 11.5,
-                                letterSpacing: 0.5,
-                                color: SColors.faint)),
-                      const SizedBox(height: SSpace.sm),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          StatusPill(look: applicationStatus(status)),
-                          const SizedBox(width: SSpace.sm),
-                          // The bank's sentence for where this stands, as sent.
-                          Expanded(
-                            child: Text(
-                              statusText,
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  height: 1.35,
-                                  fontWeight: FontWeight.w600,
-                                  color: SColors.ink),
-                            ),
-                          ),
-                        ],
+          ? Padding(
+              padding: const EdgeInsets.all(SSpace.lg),
+              child: ModuleError(message: _error!, onRetry: _load),
+            )
+          : RefreshIndicator(
+              color: Theme.of(context).colorScheme.primary,
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  SSpace.lg,
+                  SSpace.lg,
+                  SSpace.lg,
+                  SSpace.xxl,
+                ),
+                children: [
+                  if ('${a['number'] ?? ''}'.isNotEmpty)
+                    Text(
+                      '${a['number']}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        letterSpacing: 0.5,
+                        color: SColors.faint,
                       ),
-
-                      if (_error != null) ...[
-                        const SizedBox(height: SSpace.md),
-                        ModuleError(message: _error!),
-                      ],
-
-                      // What is still missing, when the bank closed it for
-                      // that reason. Its words, not a rewrite.
-                      if ('${a['missingInformation'] ?? ''}'.isNotEmpty)
-                        _Block(
-                          tone: SColors.danger,
-                          background: const Color(0xFFFBEBEB),
-                          title: 'What was missing',
-                          body: '${a['missingInformation']}',
-                        ),
-
-                      if (needsAnswer)
-                        _Counteroffer(
-                          decision: a['decision'],
-                          busy: b.busy,
-                          onAccept: () => _answer(true),
-                          onDecline: () => _answer(false),
-                        ),
-
-                      _Requested(application: a),
-                      _Decision(decision: a['decision']),
-                      _Conditions(conditions: a['conditions']),
-                      _AdverseAction(notice: a['adverseAction']),
-                      _AboutMe(application: a),
-
-                      if (counteroffer is Map &&
-                          counteroffer['pending'] != true &&
-                          ('${counteroffer['acceptedAt'] ?? ''}'.isNotEmpty ||
-                              '${counteroffer['declinedAt'] ?? ''}'
-                                  .isNotEmpty))
-                        _Block(
-                          tone: SColors.muted,
-                          background: SColors.paper2,
-                          title: 'The bank’s revised offer',
-                          body: '${counteroffer['acceptedAt'] ?? ''}'.isNotEmpty
-                              ? 'You accepted it on ${counteroffer['acceptedAt']}.'
-                              : 'You declined it on ${counteroffer['declinedAt']}.',
-                        ),
-
-                      if (loanId.isNotEmpty) ...[
-                        const SizedBox(height: SSpace.xl),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              context
-                                  .read<BankingProvider>()
-                                  .openLoanView(loanId);
-                              Navigator.of(context).push(MaterialPageRoute(
-                                  builder: (_) =>
-                                      LoanDetailScreen(loanId: loanId)));
-                            },
-                            icon: const Icon(Icons.open_in_new_rounded,
-                                size: 18),
-                            label: const Text('Open the loan'),
+                    ),
+                  const SizedBox(height: SSpace.sm),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      StatusPill(look: applicationStatus(status)),
+                      const SizedBox(width: SSpace.sm),
+                      // The bank's sentence for where this stands, as sent.
+                      Expanded(
+                        child: Text(
+                          statusText,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
+                            color: SColors.ink,
                           ),
                         ),
-                      ],
-
-                      if (canWithdraw) ...[
-                        const SizedBox(height: SSpace.md),
-                        Center(
-                          child: TextButton(
-                            onPressed: b.busy ? null : _withdraw,
-                            style: TextButton.styleFrom(
-                                foregroundColor: SColors.danger),
-                            child: const Text('Withdraw this application'),
-                          ),
-                        ),
-                      ],
+                      ),
                     ],
                   ),
-                ),
+
+                  if (_error != null) ...[
+                    const SizedBox(height: SSpace.md),
+                    ModuleError(message: _error!),
+                  ],
+
+                  // What is still missing, when the bank closed it for
+                  // that reason. Its words, not a rewrite.
+                  if ('${a['missingInformation'] ?? ''}'.isNotEmpty)
+                    _Block(
+                      tone: SColors.danger,
+                      background: const Color(0xFFFBEBEB),
+                      title: 'What was missing',
+                      body: '${a['missingInformation']}',
+                    ),
+
+                  if (needsAnswer)
+                    _Counteroffer(
+                      decision: a['decision'],
+                      busy: b.busy,
+                      onAccept: () => _answer(true),
+                      onDecline: () => _answer(false),
+                    ),
+
+                  if (actions is Map && actions['edit'] == true)
+                    OutlinedButton.icon(
+                      onPressed: b.busy ? null : _editDetails,
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Correct my application'),
+                    ),
+                  if (actions is Map && actions['uploadDocuments'] == true)
+                    OutlinedButton.icon(
+                      onPressed: b.busy ? null : () => _attachEvidence(),
+                      icon: const Icon(Icons.upload_file_outlined),
+                      label: const Text('Add supporting photo'),
+                    ),
+                  if (a['supportingDocuments'] is List)
+                    for (final file
+                        in (a['supportingDocuments'] as List).whereType<Map>())
+                      ListTile(
+                        leading: const Icon(Icons.description_outlined),
+                        title: Text(
+                          '${file['kind'] ?? 'Supporting document'}'.replaceAll(
+                            '_',
+                            ' ',
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Submitted ${file['submittedAt'] ?? ''}',
+                        ),
+                      ),
+                  if (a['conditions'] is List)
+                    for (final condition
+                        in (a['conditions'] as List).whereType<Map>())
+                      if (condition['respond'] == true)
+                        OutlinedButton(
+                          onPressed: b.busy ? null : () => _respond(condition),
+                          child: Text(
+                            'Respond: ${condition['text'] ?? 'Condition'}',
+                          ),
+                        ),
+                  _Requested(application: a),
+                  _Decision(decision: a['decision']),
+                  _Conditions(conditions: a['conditions']),
+                  _AdverseAction(notice: a['adverseAction']),
+                  if (a['adverseAction'] is Map &&
+                      '${(a['adverseAction'] as Map)['sentAt'] ?? ''}'
+                          .isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () => shareBankPdf(
+                        context,
+                        b.adverseActionPdf(widget.applicationId),
+                        'notice-${widget.applicationId}.pdf',
+                      ),
+                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      label: const Text('Download notice PDF'),
+                    ),
+                  _AboutMe(application: a),
+
+                  if (counteroffer is Map &&
+                      counteroffer['pending'] != true &&
+                      ('${counteroffer['acceptedAt'] ?? ''}'.isNotEmpty ||
+                          '${counteroffer['declinedAt'] ?? ''}'.isNotEmpty))
+                    _Block(
+                      tone: SColors.muted,
+                      background: SColors.paper2,
+                      title: 'The bank’s revised offer',
+                      body: '${counteroffer['acceptedAt'] ?? ''}'.isNotEmpty
+                          ? 'You accepted it on ${counteroffer['acceptedAt']}.'
+                          : 'You declined it on ${counteroffer['declinedAt']}.',
+                    ),
+
+                  if (loanId.isNotEmpty) ...[
+                    const SizedBox(height: SSpace.xl),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          context.read<BankingProvider>().openLoanView(loanId);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => LoanDetailScreen(loanId: loanId),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                        label: const Text('Open the loan'),
+                      ),
+                    ),
+                  ],
+
+                  if (canWithdraw) ...[
+                    const SizedBox(height: SSpace.md),
+                    Center(
+                      child: TextButton(
+                        onPressed: b.busy ? null : _withdraw,
+                        style: TextButton.styleFrom(
+                          foregroundColor: SColors.danger,
+                        ),
+                        child: const Text('Withdraw this application'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
     );
   }
 }
@@ -270,17 +580,21 @@ class _Counteroffer extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('The terms we can offer',
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: SColors.clay2)),
+          const Text(
+            'The terms we can offer',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: SColors.clay2,
+            ),
+          ),
           if (offer != null) ...[
             const SizedBox(height: SSpace.sm),
             FactRow(
-                label: 'Amount',
-                value: Money.format(offer['amount']),
-                strong: true),
+              label: 'Amount',
+              value: Money.format(offer['amount']),
+              strong: true,
+            ),
             if (offer['termMonths'] != null)
               FactRow(label: 'Term', value: '${offer['termMonths']} months'),
             if (offer['rateBps'] != null)
@@ -293,8 +607,9 @@ class _Counteroffer extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: busy ? null : onDecline,
                   style: OutlinedButton.styleFrom(
-                      foregroundColor: SColors.ink2,
-                      side: const BorderSide(color: SColors.line)),
+                    foregroundColor: SColors.ink2,
+                    side: const BorderSide(color: SColors.line),
+                  ),
                   child: const Text('Decline'),
                 ),
               ),
@@ -330,7 +645,10 @@ class _Requested extends StatelessWidget {
       children: [
         if (r['amount'] != null)
           FactRow(
-              label: 'Amount', value: Money.format(r['amount']), strong: true),
+            label: 'Amount',
+            value: Money.format(r['amount']),
+            strong: true,
+          ),
         if (r['termMonths'] != null)
           FactRow(label: 'Term', value: '${r['termMonths']} months'),
         if ('${r['purpose'] ?? ''}'.isNotEmpty)
@@ -363,21 +681,24 @@ class _Decision extends StatelessWidget {
           title: 'The decision',
           children: [
             FactRow(
-                label: 'Outcome',
-                value: '${d['outcome'] ?? ''}'.replaceAll('_', ' '),
-                strong: true),
+              label: 'Outcome',
+              value: '${d['outcome'] ?? ''}'.replaceAll('_', ' '),
+              strong: true,
+            ),
             if ('${d['decidedAt'] ?? ''}'.isNotEmpty)
               FactRow(label: 'Decided', value: '${d['decidedAt']}'),
             if (approved is Map) ...[
               FactRow(
-                  label: 'Approved amount',
-                  value: Money.format(approved['amount'])),
+                label: 'Approved amount',
+                value: Money.format(approved['amount']),
+              ),
               if (approved['termMonths'] != null)
                 FactRow(
-                    label: 'Term', value: '${approved['termMonths']} months'),
+                  label: 'Term',
+                  value: '${approved['termMonths']} months',
+                ),
               if (approved['rateBps'] != null)
-                FactRow(
-                    label: 'Rate', value: Rate.format(approved['rateBps'])),
+                FactRow(label: 'Rate', value: Rate.format(approved['rateBps'])),
             ],
           ],
         ),
@@ -388,33 +709,40 @@ class _Decision extends StatelessWidget {
             children: [
               if (tila['aprBps'] != null)
                 FactRow(
-                    label: 'APR',
-                    value: Rate.format(tila['aprBps']),
-                    strong: true),
+                  label: 'APR',
+                  value: Rate.format(tila['aprBps']),
+                  strong: true,
+                ),
               if (tila['amountFinanced'] != null)
                 FactRow(
-                    label: 'Amount financed',
-                    value: Money.format(tila['amountFinanced'])),
+                  label: 'Amount financed',
+                  value: Money.format(tila['amountFinanced']),
+                ),
               if (tila['financeCharge'] != null)
                 FactRow(
-                    label: 'Finance charge',
-                    value: Money.format(tila['financeCharge'])),
+                  label: 'Finance charge',
+                  value: Money.format(tila['financeCharge']),
+                ),
               if (tila['totalOfPayments'] != null)
                 FactRow(
-                    label: 'Total of payments',
-                    value: Money.format(tila['totalOfPayments'])),
+                  label: 'Total of payments',
+                  value: Money.format(tila['totalOfPayments']),
+                ),
               if (tila['paymentAmount'] != null)
                 FactRow(
-                    label: 'Each payment',
-                    value: Money.format(tila['paymentAmount'])),
+                  label: 'Each payment',
+                  value: Money.format(tila['paymentAmount']),
+                ),
               if (tila['paymentCount'] != null)
                 FactRow(
-                    label: 'Number of payments',
-                    value: '${tila['paymentCount']}'),
+                  label: 'Number of payments',
+                  value: '${tila['paymentCount']}',
+                ),
               if ('${tila['firstPaymentDate'] ?? ''}'.isNotEmpty)
                 FactRow(
-                    label: 'First payment',
-                    value: '${tila['firstPaymentDate']}'),
+                  label: 'First payment',
+                  value: '${tila['firstPaymentDate']}',
+                ),
             ],
           ),
         if (schedule is Map)
@@ -423,30 +751,36 @@ class _Decision extends StatelessWidget {
             children: [
               if (schedule['paymentAmount'] != null)
                 FactRow(
-                    label: 'Payment',
-                    value: Money.format(schedule['paymentAmount'])),
+                  label: 'Payment',
+                  value: Money.format(schedule['paymentAmount']),
+                ),
               if (schedule['paymentCount'] != null)
                 FactRow(
-                    label: 'Payments',
-                    value: '${schedule['paymentCount']}'),
+                  label: 'Payments',
+                  value: '${schedule['paymentCount']}',
+                ),
               if ('${schedule['frequency'] ?? ''}'.isNotEmpty)
                 FactRow(
-                    label: 'How often',
-                    value: '${schedule['frequency']}'.replaceAll('_', ' ')),
+                  label: 'How often',
+                  value: '${schedule['frequency']}'.replaceAll('_', ' '),
+                ),
               if ('${schedule['firstPaymentDate'] ?? ''}'.isNotEmpty)
                 FactRow(
-                    label: 'First payment',
-                    value: '${schedule['firstPaymentDate']}'),
+                  label: 'First payment',
+                  value: '${schedule['firstPaymentDate']}',
+                ),
               if ('${schedule['maturityDate'] ?? ''}'.isNotEmpty)
                 FactRow(
-                    label: 'Paid off by',
-                    value: '${schedule['maturityDate']}'),
+                  label: 'Paid off by',
+                  value: '${schedule['maturityDate']}',
+                ),
               if ((schedule['originationFee'] as num? ?? 0) != 0)
                 FactRow(
-                    label: schedule['feeFinanced'] == true
-                        ? 'Origination fee (added to the loan)'
-                        : 'Origination fee',
-                    value: Money.format(schedule['originationFee'])),
+                  label: schedule['feeFinanced'] == true
+                      ? 'Origination fee (added to the loan)'
+                      : 'Origination fee',
+                  value: Money.format(schedule['originationFee']),
+                ),
             ],
           ),
       ],
@@ -493,14 +827,21 @@ class _Conditions extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${c['text'] ?? ''}',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              height: 1.35,
-                              color: SColors.ink)),
-                      Text('${c['statusText'] ?? ''}',
-                          style: const TextStyle(
-                              fontSize: 11.5, color: SColors.muted)),
+                      Text(
+                        '${c['text'] ?? ''}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          color: SColors.ink,
+                        ),
+                      ),
+                      Text(
+                        '${c['statusText'] ?? ''}',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: SColors.muted,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -554,8 +895,9 @@ class _AboutMe extends StatelessWidget {
     final rows = <Widget>[
       if (income is Map && income['grossMonthly'] != null)
         FactRow(
-            label: 'Income a month',
-            value: Money.format(income['grossMonthly'])),
+          label: 'Income a month',
+          value: Money.format(income['grossMonthly']),
+        ),
       if (income is Map && '${income['source'] ?? ''}'.isNotEmpty)
         FactRow(label: 'Income from', value: '${income['source']}'),
       if (employment is Map && '${employment['employer'] ?? ''}'.isNotEmpty)
@@ -566,12 +908,14 @@ class _AboutMe extends StatelessWidget {
         FactRow(label: 'Since', value: '${employment['since']}'),
       if (m['housingPayment'] != null)
         FactRow(
-            label: 'Rent or mortgage',
-            value: Money.format(m['housingPayment'])),
+          label: 'Rent or mortgage',
+          value: Money.format(m['housingPayment']),
+        ),
       if ('${m['consentToCreditCheckAt'] ?? ''}'.isNotEmpty)
         FactRow(
-            label: 'Credit check agreed',
-            value: '${m['consentToCreditCheckAt']}'),
+          label: 'Credit check agreed',
+          value: '${m['consentToCreditCheckAt']}',
+        ),
     ];
 
     return _Section(title: 'What you told us', children: rows);
@@ -599,16 +943,24 @@ class _Section extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: SColors.ink)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: SColors.ink,
+            ),
+          ),
           if (note != null) ...[
             const SizedBox(height: 2),
-            Text(note!,
-                style: const TextStyle(
-                    fontSize: 11.5, height: 1.3, color: SColors.muted)),
+            Text(
+              note!,
+              style: const TextStyle(
+                fontSize: 11.5,
+                height: 1.3,
+                color: SColors.muted,
+              ),
+            ),
           ],
           const SizedBox(height: SSpace.sm),
           ...children,
@@ -632,34 +984,43 @@ class _Block extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(top: SSpace.lg),
-        padding: const EdgeInsets.all(SSpace.lg),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(SRadius.xl),
-          border: Border.all(color: tone.withValues(alpha: 0.4)),
+    margin: const EdgeInsets.only(top: SSpace.lg),
+    padding: const EdgeInsets.all(SSpace.lg),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(SRadius.xl),
+      border: Border.all(color: tone.withValues(alpha: 0.4)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: tone,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w800, color: tone)),
-            const SizedBox(height: SSpace.xs),
-            Text(body,
-                style: TextStyle(
-                    fontSize: 13,
-                    height: 1.4,
-                    color: tone.withValues(alpha: 0.9))),
-            if (footer != null) ...[
-              const SizedBox(height: SSpace.sm),
-              Text(footer!,
-                  style: TextStyle(
-                      fontSize: 11, color: tone.withValues(alpha: 0.7))),
-            ],
-          ],
+        const SizedBox(height: SSpace.xs),
+        Text(
+          body,
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.4,
+            color: tone.withValues(alpha: 0.9),
+          ),
         ),
-      );
+        if (footer != null) ...[
+          const SizedBox(height: SSpace.sm),
+          Text(
+            footer!,
+            style: TextStyle(fontSize: 11, color: tone.withValues(alpha: 0.7)),
+          ),
+        ],
+      ],
+    ),
+  );
 }
 
 /// Withdrawing is permanent, so it is confirmed rather than done on one tap.
@@ -683,36 +1044,34 @@ class _WithdrawDialogState extends State<_WithdrawDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        backgroundColor: SColors.card,
-        title: const Text('Withdraw this application?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'The bank stops work on it. You would have to apply again to '
-              'pick it back up.',
-              style: TextStyle(color: SColors.muted, height: 1.4),
-            ),
-            const SizedBox(height: SSpace.lg),
-            TextField(
-              controller: _reason,
-              decoration: const InputDecoration(
-                labelText: 'Reason (optional)',
-              ),
-            ),
-          ],
+    backgroundColor: SColors.card,
+    title: const Text('Withdraw this application?'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'The bank stops work on it. You would have to apply again to '
+          'pick it back up.',
+          style: TextStyle(color: SColors.muted, height: 1.4),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Keep it'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(_reason.text.trim()),
-            style: FilledButton.styleFrom(backgroundColor: SColors.danger),
-            child: const Text('Withdraw'),
-          ),
-        ],
-      );
+        const SizedBox(height: SSpace.lg),
+        TextField(
+          controller: _reason,
+          decoration: const InputDecoration(labelText: 'Reason (optional)'),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Keep it'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.of(context).pop(_reason.text.trim()),
+        style: FilledButton.styleFrom(backgroundColor: SColors.danger),
+        child: const Text('Withdraw'),
+      ),
+    ],
+  );
 }
